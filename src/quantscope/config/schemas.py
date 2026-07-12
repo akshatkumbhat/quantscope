@@ -83,6 +83,8 @@ class DataConfig(_StrictModel):
         return self
 
     snr_db: float = Field(default=8.0, ge=0.0, le=30.0)
+    # Inter-class frequency separation (texture10; margin knob, ADR-009).
+    freq_step: float = Field(default=0.30, gt=0.0, le=1.0)
 
 
 class TrainingConfig(_StrictModel):

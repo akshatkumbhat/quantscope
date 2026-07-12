@@ -83,13 +83,22 @@ None.
 - [ ] B3 (exhaustive 256-config search): deferred until a stable
   ranking exists.
 
+## Generator phase status (2026-07-12)
+
+FAILED at candidate screening (ADR-009 addendum). freq_step candidates
+0.20/0.15/0.12 on dev seed 7 all left FP32 at ~96% (target ~90-93%);
+the 18° orientation step dominates class identity. No candidate frozen,
+3-seed validation not run. freq_step remains parametrized (default
+0.30) for any future approved change.
+
 ## Next actions
 
-1. Await approval of the scoped generator change: tighter inter-class
-   separations in `texture10._class_components` to raise per-group
-   effect sizes above inter-seed variance (target: FP32 88-94% and
-   stability criterion passing), with its own iteration budget.
-2. If approved and passing: rerun B2 gate, then B3.
+1. Await reassessment decision: (a) scoped orientation-step change;
+   (b) accept FP32 ~96% and test whether per-group ranking stability
+   improves at small freq_step (W4A4 effects grew there); or
+   (c) different difficulty mechanism.
+2. B3 (exhaustive search) remains deferred until a stable ranking
+   exists.
 
 ## Known observations
 

@@ -166,3 +166,58 @@ class-separation change (tighter inter-class parameter separations in
 tuning phase; B3 (exhaustive mixed-precision search) is deferred until a
 stable ranking exists, since Pareto/search comparisons against a noise-
 dominated sensitivity signal would be meaningless.
+
+## ADR-009: Generator class-separation phase (approved 2026-07-12)
+
+Scope controls (user-set):
+
+- Change **only** the primary-component frequency separation in
+  `texture10._class_components` (`freq_step`, previously hard-coded 0.30).
+  Model, training recipe, boundary interpolation, noise, quantization
+  settings, the eight group definitions, and the B2 analysis are
+  unchanged.
+- **Intent statement:** the freq-step change reduces class margin; it is
+  NOT intended to manufacture a particular layer ranking. Any resulting
+  ranking — including a change from block_b/stem leadership — is valid if
+  meaningful, heterogeneous, and stable.
+- Development seed 7 (never seeds 0/1/2) selects the candidate.
+- Predeclared candidates, in order: **0.20, 0.15, 0.12.** Stop at the
+  first whose dev-seed FP32 lands near the middle of the target band
+  (preferably ~90–93%) with clear FP32 > W8A8 > W4A4 discrimination.
+  A single-seed ablation may be used as a screening diagnostic only;
+  Spearman stability is not a dev gate (one seed cannot establish it).
+- After selection: freeze, run the unchanged 3-seed validation
+  (seeds 0/1/2), and re-run the full B2 gate without amending criteria:
+  FP32 mean in the original 88–94% band; meaningful effect; non-uniform;
+  Spearman ≥ 0.7 in ≥ 2 of 3 pairs; existing top-group reproducibility.
+- Candidates are never chosen using the 3-seed validation. If the frozen
+  candidate fails validation, the phase is recorded **failed** and work
+  stops for reassessment — no fourth tuning cycle.
+
+### ADR-009 addendum: phase FAILED at candidate screening (2026-07-12)
+
+Dev-seed-7 results (FP32 / W8A8 / W4A4 accuracy; NLL in parens):
+
+| freq_step | FP32 | W8A8 | W4A4 |
+| --- | --- | --- | --- |
+| 0.30 baseline (seeds 0–2 mean) | 96.2% | 96.1% | 94.0% |
+| 0.20 | 96.8% (0.090) | 96.6% (0.091) | 93.5% (0.173) |
+| 0.15 | 96.5% (0.096) | 96.4% (0.096) | 93.7% (0.162) |
+| 0.12 | 96.0% (0.106) | 96.1% (0.107) | 90.9% (0.211) |
+
+No candidate approached the 88–94% band (target ~90–93%); halving the
+frequency separation moved FP32 by < 1 pp. **Diagnosis:** the 18°
+orientation step between adjacent classes carries most of the class
+identity, so compressing the frequency axis alone cannot collapse class
+margins. (Secondary observations: W4A4 damage *grew* with smaller steps —
+NLL +0.105 at 0.12 vs +0.077 at 0.20 — and the 0.12 run shows another
+small-effect W8A8 accuracy inversion, +0.1 pp, consistent with the
+ADR-008 margin finding.)
+
+Disposition: per the pre-agreed protocol, no candidate is frozen, the
+3-seed validation was not run, and no fourth tuning cycle was started.
+Reassessment options (user decision pending): (a) a new scoped generator
+change targeting the orientation step — the demonstrated dominant axis;
+(b) accept FP32 ~96% and test whether ranking *stability* (the actual B
+blocker) improves anyway, since per-group W4A4 effects grew at smaller
+freq_step; (c) a different difficulty mechanism entirely.

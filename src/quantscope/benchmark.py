@@ -38,6 +38,7 @@ def benchmark_config(
     boundary_low: float = 0.40,
     boundary_high: float = 0.50,
     snr_db: float = 4.0,
+    freq_step: float = 0.30,
     bottleneck_width: int = 6,
     output_dir: str = "runs",
 ) -> ExperimentConfig:
@@ -61,6 +62,7 @@ def benchmark_config(
             boundary_low=boundary_low,
             boundary_high=boundary_high,
             snr_db=snr_db,
+            freq_step=freq_step,
         ),
         training=TrainingConfig(
             epochs=epochs,
@@ -86,6 +88,7 @@ def texture10_calibration(config: ExperimentConfig):
             boundary_low=config.data.boundary_low,
             boundary_high=config.data.boundary_high,
             snr_db=config.data.snr_db,
+            freq_step=config.data.freq_step,
         ),
     )
 

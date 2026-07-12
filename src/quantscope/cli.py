@@ -75,6 +75,7 @@ def ablate(
     runs_dir: str = typer.Option("runs/validation", "--runs-dir"),
     weight_bits: int = typer.Option(4, "--weight-bits"),
     act_bits: int = typer.Option(4, "--act-bits"),
+    freq_step: float = typer.Option(0.30, "--freq-step"),
 ) -> None:
     """Per-group quantization ablation vs. an FP32 texture-bench checkpoint. Slow."""
     from quantscope.benchmark import benchmark_config, texture10_calibration
@@ -82,7 +83,7 @@ def ablate(
     from quantscope.quantization.simulate import SimQuantConfig
     from quantscope.sensitivity import ablate_groups
 
-    config = benchmark_config(seed=seed, output_dir=runs_dir)
+    config = benchmark_config(seed=seed, output_dir=runs_dir, freq_step=freq_step)
     checkpoint = Path(runs_dir) / f"texture-a-seed{seed}-fp32" / "model.pt"
     calibration = texture10_calibration(config)
     _, test_set = build_datasets(config.data, config.model)
@@ -109,6 +110,7 @@ def texture_bench(
     boundary_low: float = typer.Option(0.40, "--boundary-low"),
     boundary_high: float = typer.Option(0.50, "--boundary-high"),
     snr_db: float = typer.Option(4.0, "--snr-db"),
+    freq_step: float = typer.Option(0.30, "--freq-step"),
     bottleneck_width: int = typer.Option(6, "--bottleneck-width"),
     output_dir: str = typer.Option("runs", "--output-dir"),
 ) -> None:
@@ -122,6 +124,7 @@ def texture_bench(
         boundary_low=boundary_low,
         boundary_high=boundary_high,
         snr_db=snr_db,
+        freq_step=freq_step,
         bottleneck_width=bottleneck_width,
         output_dir=output_dir,
     )

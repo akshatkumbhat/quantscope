@@ -130,3 +130,43 @@ class TestSimulateQuantized:
         ds = torch.utils.data.TensorDataset(torch.randn(8, 4), torch.zeros(8, dtype=torch.long))
         with pytest.raises(ValueError, match="ReLU"):
             simulate_quantized(model, ds, SimQuantConfig(8, 8))
+
+
+class TestFreqStep:
+    def test_smaller_step_increases_class_similarity(self) -> None:
+        # freq_step is a margin knob: adjacent classes' *power spectra*
+        # (phase-invariant, unlike mean images, which wash out under the
+        # random per-sample phase) must grow more correlated as the step
+        # shrinks (ADR-009).
+        from scipy.ndimage import gaussian_filter
+
+        def adjacent_spectral_correlation(step: float) -> float:
+            params = Texture10Params(
+                num_classes=10,
+                image_size=32,
+                boundary_fraction=0.0,
+                snr_db=30.0,
+                rotation_deg=0.0,
+                freq_jitter=0.0,
+                blur_sigma_max=0.0,
+                contrast_low=1.0,
+                contrast_high=1.0,
+                freq_step=step,
+            )
+            ds = make_texture10(num_samples=100, seed=0, params=params)
+            images, labels = ds.tensors
+
+            def class_spectrum(k: int) -> np.ndarray:
+                imgs = images[labels == k, 0].numpy()
+                power = np.abs(np.fft.fft2(imgs)) ** 2
+                return gaussian_filter(power.mean(axis=0), sigma=1.0).ravel()
+
+            s0, s1 = class_spectrum(0), class_spectrum(1)
+            s0, s1 = s0 - s0.mean(), s1 - s1.mean()
+            return float(np.dot(s0, s1) / (np.linalg.norm(s0) * np.linalg.norm(s1)))
+
+        assert adjacent_spectral_correlation(0.05) > adjacent_spectral_correlation(0.60)
+
+    def test_invalid_freq_step_rejected(self) -> None:
+        with pytest.raises(ValueError, match="freq_step"):
+            Texture10Params(freq_step=0.0)
