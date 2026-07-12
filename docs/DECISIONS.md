@@ -38,3 +38,18 @@ torch-specific code sits behind adapters so a future PT2E migration is
 localized. `fbgemm`/`x86` is the default engine for INT8 CPU execution on
 this machine; INT4 remains simulation-only (no real INT4 backend exists
 here — see honesty rules).
+
+## ADR-007: Bounded deterministic sampling for distribution observers
+
+Percentile and MSE-grid-search observers need the value distribution, not
+just min/max. Instead of unbounded storage or complex streaming histograms,
+each batch is subsampled to at most `samples_per_batch` (default 8192)
+elements with a fixed-seed RNG. Memory grows linearly with calibration
+batch count (small by design), results are reproducible across runs, and
+the implementation stays simple enough to test exhaustively. Per-channel
+granularity is explicitly rejected for these two observers (out of scope);
+`MinMaxObserver` and `PowerOfTwoScaleObserver` support it. The
+`PowerOfTwoScaleObserver` rounds scales **up** to the next power of two so
+snapping never introduces clipping (up to 2x coarser steps instead), and
+recomputes the zero point for asymmetric schemes so zero stays exactly
+representable.

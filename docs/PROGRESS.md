@@ -27,11 +27,20 @@ Phase 2 — Numerical quantization core
   symmetric/asymmetric scale+zero-point, per-tensor/per-channel,
   quantize/dequantize/fake-quantize, power-of-two scale approximation,
   typed `QuantParams` metadata. All arithmetic here is **simulated**.
-- [x] 47 unit tests passing; ruff lint + format clean; CLI smoke-tested.
+- [x] 47 unit tests for the affine core.
+- [x] Phase 3 — numerical-error metrics (`analysis/metrics.py`): MSE,
+  SQNR (dB), cosine similarity, max-abs error, saturation rate, combined
+  `ErrorMetrics` with JSON-serializable output; documented degenerate-case
+  behavior (zero signal, zero noise, zero vectors).
+- [x] Phase 3 — observers (`observers/`): streaming `CalibrationObserver`
+  base + `MinMaxObserver` baseline, `PercentileClippingObserver`,
+  `PowerOfTwoScaleObserver` (round-up snapping, zero-point recomputed),
+  `MSEGridSearchObserver` (ADR-007). Empty/NaN calibration rejected.
+- [x] 90 unit tests passing total; ruff lint + format clean; CLI works.
 
-## In progress
+## Current phase (updated)
 
-Nothing — Phase 2 core complete, ready for Phase 3.
+Phase 4 — FP32 training/evaluation and PTQ integration is next.
 
 ## Blocked
 
@@ -39,8 +48,7 @@ None.
 
 ## Next actions
 
-1. Phase 3: custom observers (`PercentileClippingObserver`,
-   `PowerOfTwoScaleObserver`, `MSEGridSearchObserver`).
-2. Layer-level numerical-error metrics (MSE, SQNR, cosine, max-abs,
-   saturation rate).
-3. Typed experiment config schemas (pydantic) and artifact I/O.
+1. Typed experiment config schemas (pydantic) and artifact I/O with
+   measured/simulated/estimated provenance labels.
+2. Tiny CPU-friendly model + synthetic/small dataset plumbing.
+3. FP32 train/eval loop, then FX-graph-mode PTQ using these observers.

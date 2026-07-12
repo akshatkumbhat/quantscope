@@ -293,20 +293,36 @@ def fake_quantize(values: np.ndarray, params: QuantParams) -> np.ndarray:
     return dequantize(quantize(values, params), params)
 
 
-def power_of_two_scale(scale: float | np.ndarray) -> np.ndarray:
-    """Approximate positive scales by the nearest power of two.
+def power_of_two_scale(scale: float | np.ndarray, mode: str = "nearest") -> np.ndarray:
+    """Approximate positive scales by a power of two.
 
-    Rounding policy: round ``log2(scale)`` half-up to the nearest integer
-    exponent, i.e. ``2 ** round(log2(scale))``; exact midpoints in log space
-    round toward the larger exponent. This keeps the approximation within a
-    factor of ``sqrt(2)`` of the input and yields shift-only rescaling on
-    hardware without multipliers.
+    Rounding policy (``mode``):
+        - ``"nearest"`` (default): round ``log2(scale)`` half-up to the
+          nearest integer exponent; exact midpoints in log space round
+          toward the larger exponent. Result is within a factor of
+          ``sqrt(2)`` of the input.
+        - ``"up"``: smallest power of two ``>= scale``. Never shrinks the
+          representable range (no added clipping), at the cost of up to 2x
+          coarser steps.
+        - ``"down"``: largest power of two ``<= scale``.
+
+    Power-of-two scales allow shift-only rescaling on hardware without
+    multipliers.
 
     Raises:
-        ValueError: if any scale is non-positive, NaN, or infinite.
+        ValueError: if any scale is non-positive, NaN, or infinite, or
+            ``mode`` is unknown.
     """
     arr = np.asarray(scale, dtype=np.float64)
     if not np.all(np.isfinite(arr)) or np.any(arr <= 0):
         raise ValueError("scale must be finite and strictly positive")
-    exponents = np.floor(np.log2(arr) + 0.5)
+    log2 = np.log2(arr)
+    if mode == "nearest":
+        exponents = np.floor(log2 + 0.5)
+    elif mode == "up":
+        exponents = np.ceil(log2)
+    elif mode == "down":
+        exponents = np.floor(log2)
+    else:
+        raise ValueError(f"unknown rounding mode: {mode!r}")
     return np.power(2.0, exponents).astype(np.float32)
