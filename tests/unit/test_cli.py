@@ -1,4 +1,4 @@
-\"\"\"Tests for the QuantScope CLI.\"\"\"
+"""Tests for the QuantScope CLI."""
 
 from typer.testing import CliRunner
 
@@ -8,12 +8,12 @@ runner = CliRunner()
 
 
 def test_cli_help() -> None:
-    result = runner.invoke(app, [\"--help\"])
+    result = runner.invoke(app, ["--help"])
     assert result.exit_code == 0
-    assert \"quantization\" in result.stdout.lower()
+    assert "quantization" in result.stdout.lower()
 
 
 def test_version_info() -> None:
-    result = runner.invoke(app, [\"version-info\"])
+    result = runner.invoke(app, ["version-info"])
     assert result.exit_code == 0
-    assert \"QuantScope\" in result.stdout
+    assert "QuantScope" in result.stdout

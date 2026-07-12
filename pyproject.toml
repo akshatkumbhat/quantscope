@@ -11,7 +11,10 @@ requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [{ name = "Akshat Kumbhat" }]
 dependencies = [
-    "numpy>=1.26",
+    # numpy<2: torch 2.2.2 (last release with Intel-macOS wheels) is compiled
+    # against NumPy 1.x; tensor<->ndarray interop fails under NumPy 2.
+    # See docs/DECISIONS.md ADR-005.
+    "numpy>=1.26,<2",
     "pandas>=2.1",
     "scipy>=1.11",
     "matplotlib>=3.8",
@@ -41,6 +44,10 @@ packages = ["src/quantscope"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra"
+markers = [
+    "slow: long-running experiments; excluded from quick CI runs",
+    "integration: end-to-end workflow tests",
+]
 
 [tool.ruff]
 target-version = "py311"
