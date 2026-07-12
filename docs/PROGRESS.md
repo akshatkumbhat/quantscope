@@ -71,16 +71,25 @@ runs/validation/ (not committed).
 
 None.
 
+## B status (2026-07-12)
+
+- [x] B1: eight-group partition, per-group simulated quantization,
+  prediction-flips metric, `ablate` CLI; unit tests for partition
+  coverage and targeted-group isolation.
+- [x] B2: 3-seed ablation ran; stop gate evaluated —
+  **STOP before C** (ADR-008 addendum 3). Sensitivity is meaningful
+  (max mean ΔNLL +0.014) and non-uniform (max/median 3.76) but
+  unstable across seeds (Spearman ≤ 0.405; top-2 reproduced 1/3).
+- [ ] B3 (exhaustive 256-config search): deferred until a stable
+  ranking exists.
+
 ## Next actions
 
-1. B1: eight-group quantization partition for BottleneckResNet;
-   per-group simulated quantization; W4A4 one-group-at-a-time ablation
-   with ΔNLL (primary), prediction flips, Δaccuracy, Δmargin.
-2. B2: ranking stability across the 3 seed checkpoints; evaluate the B
-   stop gate (non-uniform + stable => continue; flat/unstable => stop
-   before C and open generator retuning as a new approved phase).
-3. B3 (gate permitting): exhaustive 256-config INT4/INT8 search, exact
-   Pareto frontier, greedy/sensitivity-ranked/random baselines.
+1. Await approval of the scoped generator change: tighter inter-class
+   separations in `texture10._class_components` to raise per-group
+   effect sizes above inter-seed variance (target: FP32 88-94% and
+   stability criterion passing), with its own iteration budget.
+2. If approved and passing: rerun B2 gate, then B3.
 
 ## Known observations
 

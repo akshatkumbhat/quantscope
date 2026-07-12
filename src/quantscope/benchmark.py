@@ -74,13 +74,9 @@ def benchmark_config(
     )
 
 
-def run_texture_benchmark(config: ExperimentConfig) -> dict[str, dict[str, float]]:
-    """Train FP32, simulate W8A8/W4A4, and write one labeled artifact.
-
-    Returns {"fp32": {...}, "W8A8": {...}, "W4A4": {...}} detailed metrics.
-    """
-    model, _ = train_fp32(config)
-    calibration = make_texture10(
+def texture10_calibration(config: ExperimentConfig):
+    """The benchmark's calibration split (disjoint seed stream +2)."""
+    return make_texture10(
         num_samples=config.data.num_calib,
         seed=config.data.seed + 2,
         params=Texture10Params(
@@ -92,6 +88,15 @@ def run_texture_benchmark(config: ExperimentConfig) -> dict[str, dict[str, float
             snr_db=config.data.snr_db,
         ),
     )
+
+
+def run_texture_benchmark(config: ExperimentConfig) -> dict[str, dict[str, float]]:
+    """Train FP32, simulate W8A8/W4A4, and write one labeled artifact.
+
+    Returns {"fp32": {...}, "W8A8": {...}, "W4A4": {...}} detailed metrics.
+    """
+    model, _ = train_fp32(config)
+    calibration = texture10_calibration(config)
     # Same test set the fp32 run evaluated on (seed stream +1).
     from quantscope.data.synthetic import build_datasets
 

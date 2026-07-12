@@ -70,6 +70,38 @@ def ptq(
 
 
 @app.command()
+def ablate(
+    seed: int = typer.Option(0, "--seed"),
+    runs_dir: str = typer.Option("runs/validation", "--runs-dir"),
+    weight_bits: int = typer.Option(4, "--weight-bits"),
+    act_bits: int = typer.Option(4, "--act-bits"),
+) -> None:
+    """Per-group quantization ablation vs. an FP32 texture-bench checkpoint. Slow."""
+    from quantscope.benchmark import benchmark_config, texture10_calibration
+    from quantscope.data.synthetic import build_datasets
+    from quantscope.quantization.simulate import SimQuantConfig
+    from quantscope.sensitivity import ablate_groups
+
+    config = benchmark_config(seed=seed, output_dir=runs_dir)
+    checkpoint = Path(runs_dir) / f"texture-a-seed{seed}-fp32" / "model.pt"
+    calibration = texture10_calibration(config)
+    _, test_set = build_datasets(config.data, config.model)
+    results = ablate_groups(
+        config,
+        calibration,
+        test_set,
+        checkpoint=checkpoint,
+        target=SimQuantConfig(weight_bits, act_bits),
+    )
+    for group, deltas in sorted(results.items(), key=lambda kv: kv[1]["delta_nll"], reverse=True):
+        typer.echo(
+            f"{group:>14} (simulated): dNLL={deltas['delta_nll']:+.4f} "
+            f"flips={deltas['prediction_flip_rate']:.4f} "
+            f"dAcc={deltas['delta_accuracy']:+.4f}"
+        )
+
+
+@app.command()
 def texture_bench(
     seed: int = typer.Option(0, "--seed"),
     epochs: int = typer.Option(35, "--epochs"),

@@ -139,3 +139,30 @@ non-uniform sensitivity in ΔNLL, prediction flips, or accuracy — continue
 on the frozen recipe. If the ranking is effectively flat, tie-dominated,
 or unstable across seeds — stop before C and open the generator-level
 class-separation change as a new approved tuning phase.
+
+### ADR-008 addendum 3: B stop gate result — STOP (2026-07-12)
+
+Per-group W4A4 ablation over the 3 seed checkpoints
+(`scripts/check_sensitivity_gate.py`, thresholds fixed before running):
+
+- Criterion 1 (meaningful) — **passed**: max mean ΔNLL +0.014 (block_b),
+  flip rates up to 2.9%.
+- Criterion 2 (non-uniform) — **passed**: max/median mean-ΔNLL ratio 3.76;
+  block_b and stem lead, block_a groups near zero (block_a_conv2 slightly
+  negative), consistent with the residual-bypass design intent.
+- Criterion 3 (stability) — **FAILED**: pairwise Spearman 0.405 / 0.405 /
+  0.095 (0 of 3 pairs ≥ 0.7); mean top-2 {block_b, stem} reproduced in
+  only 1 of 3 individual seeds. Per-seed ΔNLL for block_b spans +0.002 to
+  +0.024; bottleneck is negative on seed 2.
+
+Interpretation: single-group W4A4 effects (ΔNLL ≤ 0.024 on a ~0.09
+baseline) are the same order as inter-seed variance — the task is still
+too easy for one group's quantization noise to reliably move the loss.
+This is the failure mode the gate was designed to catch.
+
+Disposition: **stopped before plan step C.** The generator-level
+class-separation change (tighter inter-class parameter separations in
+`texture10._class_components`) is proposed as a new, separately approved
+tuning phase; B3 (exhaustive mixed-precision search) is deferred until a
+stable ranking exists, since Pareto/search comparisons against a noise-
+dominated sensitivity signal would be meaningless.
