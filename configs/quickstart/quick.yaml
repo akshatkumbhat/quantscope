@@ -1,0 +1,28 @@
+# Quick-mode experiment: runs end-to-end on CPU in well under a minute.
+run_name: quickstart
+output_dir: runs
+
+model:
+  name: tiny_cnn
+  num_classes: 4
+  in_channels: 1
+
+data:
+  name: synthetic
+  num_train: 512
+  num_eval: 256
+  image_size: 16
+  seed: 0
+
+training:
+  epochs: 4
+  batch_size: 32
+  learning_rate: 0.01
+  seed: 0
+
+quantization:
+  bits: 8
+  scheme: asymmetric
+  granularity: per_tensor
+  observer: minmax
+  calibration_batches: 8

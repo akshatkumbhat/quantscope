@@ -38,9 +38,23 @@ Phase 2 — Numerical quantization core
   `MSEGridSearchObserver` (ADR-007). Empty/NaN calibration rejected.
 - [x] 90 unit tests passing total; ruff lint + format clean; CLI works.
 
+- [x] Phase 4 — configs, training, and PTQ:
+  - Typed pydantic configs (`config/schemas.py`), YAML loading, strict
+    validation, frozen models; `Provenance` label enum (ADR-004).
+  - Utilities: seeding, environment capture (packages/git/engines),
+    `RunWriter` artifact I/O that refuses unlabeled metrics.
+  - FX-traceable `TinyCNN`; deterministic synthetic dataset (sinusoid
+    patterns per class, no downloads); CPU FP32 train/eval loop.
+  - FX-graph-mode PTQ (`quantization/ptq.py`, fbgemm engine): calibrate,
+    convert, measured INT8 CPU accuracy + serialized sizes vs FP32.
+  - CLI: `env-info`, `train-fp32`, `ptq`; quickstart config runs
+    end-to-end in seconds (`configs/quickstart/quick.yaml`).
+- [x] 116 tests passing (incl. PTQ integration test); ruff clean.
+
 ## Current phase (updated)
 
-Phase 4 — FP32 training/evaluation and PTQ integration is next.
+Phase 5 — layer-level numerical debugging (capture FP32 vs quantized
+per-layer outputs, apply analysis metrics per layer) is next.
 
 ## Blocked
 
@@ -48,7 +62,14 @@ None.
 
 ## Next actions
 
-1. Typed experiment config schemas (pydantic) and artifact I/O with
-   measured/simulated/estimated provenance labels.
-2. Tiny CPU-friendly model + synthetic/small dataset plumbing.
-3. FP32 train/eval loop, then FX-graph-mode PTQ using these observers.
+1. Layer-output capture on identical inputs (hooks on FP32 + quantized).
+2. Per-layer ErrorMetrics artifacts (JSON/CSV) with provenance labels.
+3. Proxy sensitivity ranking from per-layer metrics (Phase 6 start).
+
+## Known observations
+
+- Quickstart accuracy saturates at 1.0 (task intentionally easy);
+  differences will show at lower bit widths and in per-layer metrics.
+- INT8 size compression on TinyCNN is ~1.5x, not the asymptotic ~4x:
+  serialization overhead dominates at this model size (documented in the
+  integration test).
