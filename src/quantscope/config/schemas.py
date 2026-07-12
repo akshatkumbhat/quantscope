@@ -52,19 +52,37 @@ class _StrictModel(BaseModel):
 class ModelConfig(_StrictModel):
     """Model architecture selection."""
 
-    name: Literal["tiny_cnn"] = "tiny_cnn"
+    name: Literal["tiny_cnn", "bottleneck_resnet"] = "tiny_cnn"
     num_classes: int = Field(default=4, ge=2, le=1000)
     in_channels: int = Field(default=1, ge=1, le=4)
+    bottleneck_width: int = Field(default=6, ge=2, le=16)  # bottleneck_resnet only
 
 
 class DataConfig(_StrictModel):
-    """Dataset selection. `synthetic` requires no downloads or network."""
+    """Dataset selection. Both datasets are synthetic: no downloads/network."""
 
-    name: Literal["synthetic"] = "synthetic"
+    name: Literal["synthetic", "texture10"] = "synthetic"
     num_train: int = Field(default=512, ge=8)
     num_eval: int = Field(default=256, ge=8)
+    num_calib: int = Field(default=256, ge=8)  # texture10 only
     image_size: int = Field(default=16, ge=8, le=64)
     seed: int = 0
+    # texture10 difficulty knobs (ignored by `synthetic`).
+    boundary_fraction: float = Field(default=0.2, ge=0.0, le=0.5)
+    # Interpolation range toward the neighbor class; 0.5 = fully ambiguous
+    # mixture (irreducible error on those samples by design).
+    boundary_low: float = Field(default=0.30, ge=0.0, le=0.5)
+    boundary_high: float = Field(default=0.45, ge=0.3, le=0.5)
+
+    @model_validator(mode="after")
+    def _check_boundary(self) -> DataConfig:
+        if self.boundary_low >= self.boundary_high:
+            raise ValueError(
+                f"boundary_low ({self.boundary_low}) must be < boundary_high ({self.boundary_high})"
+            )
+        return self
+
+    snr_db: float = Field(default=8.0, ge=0.0, le=30.0)
 
 
 class TrainingConfig(_StrictModel):
@@ -73,6 +91,9 @@ class TrainingConfig(_StrictModel):
     epochs: int = Field(default=3, ge=1, le=100)
     batch_size: int = Field(default=32, ge=1)
     learning_rate: float = Field(default=1e-2, gt=0)
+    optimizer: Literal["adam", "adamw"] = "adam"
+    weight_decay: float = Field(default=0.0, ge=0.0)
+    schedule: Literal["none", "cosine"] = "none"
     seed: int = 0
 
 

@@ -53,8 +53,19 @@ Phase 2 — Numerical quantization core
 
 ## Current phase (updated)
 
-Phase 5 — layer-level numerical debugging (capture FP32 vs quantized
-per-layer outputs, apply analysis metrics per layer) is next.
+Benchmark plan step B — per-group W4A4 ablation, sensitivity ranking, and
+(gate permitting) exhaustive 256-config mixed-precision search.
+
+Step A closed **partial pass** (ADR-008 addendum 2): benchmark
+discriminates bit widths (mean W4A4 −2.2 pp / NLL +64% across 3 seeds;
+W8A8 ≈ FP32 with NLL effect +4e-5), with two recorded deviations — mean
+FP32 96.22% vs the ≤96% condition, and the W8A8 mean-margin direction
+failed on all seeds (margin rose slightly; see prospective metric note).
+Deliverables: Texture-10 generator, BottleneckResNet (~20k params, 8
+distinct ReLU sites), evaluate_detailed (accuracy/NLL/margin), simulation
+policy v1 (quantization/simulate.py), texture-bench CLI, acceptance
+checker script. FP32 checkpoints for seeds 0-2 live under
+runs/validation/ (not committed).
 
 ## Blocked
 
@@ -62,9 +73,14 @@ None.
 
 ## Next actions
 
-1. Layer-output capture on identical inputs (hooks on FP32 + quantized).
-2. Per-layer ErrorMetrics artifacts (JSON/CSV) with provenance labels.
-3. Proxy sensitivity ranking from per-layer metrics (Phase 6 start).
+1. B1: eight-group quantization partition for BottleneckResNet;
+   per-group simulated quantization; W4A4 one-group-at-a-time ablation
+   with ΔNLL (primary), prediction flips, Δaccuracy, Δmargin.
+2. B2: ranking stability across the 3 seed checkpoints; evaluate the B
+   stop gate (non-uniform + stable => continue; flat/unstable => stop
+   before C and open generator retuning as a new approved phase).
+3. B3 (gate permitting): exhaustive 256-config INT4/INT8 search, exact
+   Pareto frontier, greedy/sensitivity-ranked/random baselines.
 
 ## Known observations
 

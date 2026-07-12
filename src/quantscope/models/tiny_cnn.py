@@ -42,4 +42,12 @@ def build_model(config: ModelConfig) -> nn.Module:
     """Build the configured model architecture."""
     if config.name == "tiny_cnn":
         return TinyCNN(num_classes=config.num_classes, in_channels=config.in_channels)
+    if config.name == "bottleneck_resnet":
+        from quantscope.models.bottleneck_resnet import BottleneckResNet
+
+        return BottleneckResNet(
+            num_classes=config.num_classes,
+            in_channels=config.in_channels,
+            bottleneck_width=config.bottleneck_width,
+        )
     raise ValueError(f"unknown model: {config.name!r}")

@@ -53,3 +53,89 @@ granularity is explicitly rejected for these two observers (out of scope);
 snapping never introduces clipping (up to 2x coarser steps instead), and
 recomputes the zero point for asymmetric schemes so zero stays exactly
 representable.
+
+## ADR-008: Texture-10 benchmark A and simulation policy v1
+
+The original synthetic task saturated (FP32 = INT8 = 1.0 accuracy), so the
+benchmark measured nothing. Following an external design review, benchmark
+A uses: (1) **Texture-10** — 10 sinusoid-texture classes with deliberately
+small parameter separations, 15–25% boundary examples interpolated 30–45%
+toward a neighboring prototype (label preserved), SNR-controlled noise, and
+analytic rotation/translation (orientation/phase jitter, no warping
+artifacts); (2) a ~20k-param **BottleneckResNet** whose structure (residual
+bypasses vs. a 6-channel bottleneck vs. an unprotected downsample) gives
+per-layer sensitivity a reason to be non-uniform; (3) **NLL and correct-class
+margin** as primary discrimination metrics, because top-1 accuracy is
+discrete and produces false ties.
+
+**Simulation policy v1** (`quantization/simulate.py`): weights per-channel
+symmetric at W bits; model input + ReLU outputs per-tensor asymmetric at A
+bits, min-max calibrated; BN unfolded, logits unquantized. All results from
+this path are labeled **simulated**. It intentionally does not match
+backend INT8 semantics — the backend-matched profile is deliverable C.
+Boundary-example interpolation was chosen over label noise because label
+noise lowers the ceiling without making the decision function more
+quantization-sensitive. Gates (dev seed first, then 3 frozen seeds): FP32
+88–94%, W4A4 clearly degraded in NLL/margin/accuracy, W8A8 drop nonzero
+but smaller; max 3 tuning iterations, then stop and report.
+
+### ADR-008 addendum: frozen recipe and accepted gate deviation (2026-07-11)
+
+Tuning findings over the 3-iteration budget (dev seed 0):
+
+- Iter 1 (boundary 0.20, λ∈[0.30,0.45], SNR 8 dB): FP32 99.95% — saturated.
+- Iter 2 (boundary 0.35, SNR 4 dB): FP32 99.95% — unchanged. Boundary
+  fraction and SNR alone do not create error here.
+- Iter 3 (boundary 0.45, λ∈[0.40,0.50], SNR 4 dB): FP32 96.0%,
+  W8A8 95.95%, W4A4 91.6%; NLL 0.102 / 0.103 / 0.211; margin
+  5.91 / 5.94 / 4.79.
+
+Diagnosis: label-preserving interpolation below λ=0.5 leaves the true
+class with a detectable energy advantage, so a converged model incurs no
+irreducible error; only interpolation *near* λ=0.5 produces real
+ambiguity. Boundary fraction and SNR are weak difficulty levers for this
+model class.
+
+Decision (user-approved): freeze the iteration-3 recipe as the benchmark-A
+default; close A as a **conditional pass with a documented deviation** —
+FP32 misses the 88–94% band high by ~2 pp. The band was not widened after
+seeing results. Acceptance over 3 fixed seeds requires: aggregate
+NLL/margin monotone FP32 > W8A8 > W4A4; mean W4A4 accuracy clearly
+degraded; W8A8 less degraded than W4A4; mean FP32 ≤ 96% with no seed
+saturated; W8A8 effect required in NLL/margin only (accuracy is discrete).
+No generator retuning before plan step B; if per-group ablation shows 96%
+obstructs sensitivity analysis, class-separation parameters get revisited
+as a separately approved change
+(`scripts/check_texture_a_acceptance.py` encodes the conditions).
+
+### ADR-008 addendum 2: 3-seed validation result — A closed as PARTIAL PASS
+
+Checker result (conditions unchanged, recorded as agreed; script exits 1
+on the frozen recipe and that is the accepted record):
+
+- Mean FP32 accuracy 96.22% — **failed** the ≤96% condition by 0.22 pp.
+- W8A8 mean-margin direction — **failed on all three seeds** (margin rose:
+  5.905→5.935, 6.425→6.432, 5.765→5.784).
+- W8A8 NLL effect — passed (aggregate 0.0938 → 0.0938, +4e-5).
+- W4A4 degradation and bit-width discrimination — passed (mean accuracy
+  −2.2 pp, NLL +64%, margin −0.69; degradation present in every seed).
+- Tuning budget — exhausted (3 iterations).
+
+Disposition (user decision, 2026-07-12): **partial pass with two
+documented deviations; benchmark usable pending the B sensitivity gate.**
+The FP32 cap was not raised and the margin condition was not removed
+post hoc. The 0.22 pp cap miss alone does not justify another tuning
+cycle.
+
+Prospective interpretation for future phases: mean correct-class margin
+aggregates differently from NLL (it is dominated by well-classified
+samples and can move opposite to NLL for near-zero effects), so it must
+not be used as a guaranteed-monotone acceptance metric for very small
+W8A8-scale effects. It remains a valid *diagnostic* and a valid
+discrimination metric for large effects (W4A4 moved it −0.69).
+
+**B stop gate:** if per-group W4A4 ablations show meaningful,
+non-uniform sensitivity in ΔNLL, prediction flips, or accuracy — continue
+on the frozen recipe. If the ranking is effectively flat, tie-dominated,
+or unstable across seeds — stop before C and open the generator-level
+class-separation change as a new approved tuning phase.

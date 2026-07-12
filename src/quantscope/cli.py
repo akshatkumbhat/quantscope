@@ -69,5 +69,38 @@ def ptq(
     typer.echo(f"int8 eval accuracy (measured, CPU): {metrics['accuracy']:.4f}")
 
 
+@app.command()
+def texture_bench(
+    seed: int = typer.Option(0, "--seed"),
+    epochs: int = typer.Option(35, "--epochs"),
+    boundary_fraction: float = typer.Option(0.45, "--boundary-fraction"),
+    boundary_low: float = typer.Option(0.40, "--boundary-low"),
+    boundary_high: float = typer.Option(0.50, "--boundary-high"),
+    snr_db: float = typer.Option(4.0, "--snr-db"),
+    bottleneck_width: int = typer.Option(6, "--bottleneck-width"),
+    output_dir: str = typer.Option("runs", "--output-dir"),
+) -> None:
+    """Run Texture-10 benchmark A: FP32 (measured) vs simulated W8A8/W4A4. Slow."""
+    from quantscope.benchmark import benchmark_config, run_texture_benchmark
+
+    config = benchmark_config(
+        seed=seed,
+        epochs=epochs,
+        boundary_fraction=boundary_fraction,
+        boundary_low=boundary_low,
+        boundary_high=boundary_high,
+        snr_db=snr_db,
+        bottleneck_width=bottleneck_width,
+        output_dir=output_dir,
+    )
+    results = run_texture_benchmark(config)
+    for label, metrics in results.items():
+        provenance = "measured" if label == "fp32" else "simulated"
+        typer.echo(
+            f"{label:>5} ({provenance}): accuracy={metrics['accuracy']:.4f} "
+            f"nll={metrics['nll']:.4f} margin={metrics['mean_margin']:.3f}"
+        )
+
+
 if __name__ == "__main__":
     app()
