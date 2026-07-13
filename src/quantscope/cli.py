@@ -103,6 +103,49 @@ def ablate(
 
 
 @app.command()
+def sweep(
+    seed: int = typer.Option(0, "--seed"),
+    runs_dir: str = typer.Option("runs/validation-012", "--runs-dir"),
+    freq_step: float = typer.Option(0.12, "--freq-step"),
+) -> None:
+    """Exhaustive 256-config INT4/INT8 sweep vs an FP32 checkpoint. Very slow."""
+    import json
+
+    import torch
+
+    from quantscope.benchmark import benchmark_config, texture10_calibration
+    from quantscope.config import Provenance
+    from quantscope.data.synthetic import build_datasets
+    from quantscope.models.tiny_cnn import build_model
+    from quantscope.search import exhaustive_sweep, pareto_frontier
+    from quantscope.utilities import RunWriter
+
+    config = benchmark_config(seed=seed, output_dir=runs_dir, freq_step=freq_step)
+    checkpoint = Path(runs_dir) / f"texture-a-seed{seed}-fp32" / "model.pt"
+    model = build_model(config.model)
+    model.load_state_dict(torch.load(checkpoint))
+    model.eval()
+    calibration = texture10_calibration(config)
+    _, test_set = build_datasets(config.data, config.model)
+
+    records = exhaustive_sweep(model, calibration, test_set, batch_size=config.training.batch_size)
+    writer = RunWriter(config, kind="sweep")
+    (writer.run_dir / "sweep_table.json").write_text(
+        json.dumps([r.to_dict() for r in records], indent=1) + "\n"
+    )
+    frontier = pareto_frontier(records, quality="nll")
+    writer.record_metric("num_configs", len(records), Provenance.SIMULATED)
+    writer.record_metric(
+        "pareto_size_nll",
+        len(frontier),
+        Provenance.SIMULATED,
+        note="cost is estimated (normalized weight bits); nll simulated",
+    )
+    writer.finalize()
+    typer.echo(f"sweep complete: {len(records)} configs, NLL-frontier size {len(frontier)}")
+
+
+@app.command()
 def texture_bench(
     seed: int = typer.Option(0, "--seed"),
     epochs: int = typer.Option(35, "--epochs"),

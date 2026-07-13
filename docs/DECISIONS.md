@@ -306,3 +306,59 @@ diagnostic first: rerun the ablation at a harsher target (e.g. W3A3) on
 the three existing freq_step=0.12 checkpoints — no retraining — to test
 whether instability is effect-size-limited before any further generator
 work.
+
+## ADR-010: B3 mixed-precision search — reframed deliverable (2026-07-13)
+
+Frozen conclusions carried forward unchanged (user decision): B2 failed
+its preregistered cross-seed stability gate; the failure reproduced under
+two generator settings; increasing the mean effect did not stabilize the
+ranking; therefore **W4A4 layer sensitivity is checkpoint-conditioned for
+this benchmark and model scale and must not be presented as an
+architecture-level property.** This is a result, not a defect to tune
+away. W3A3 is retained only as an optional later stress-test appendix,
+not as a rescue of the failed criterion.
+
+### B3 pre-registration (recorded before any sweep ran)
+
+Inputs: the three validated freq_step=0.12 checkpoints (seeds 0/1/2), no
+seed selection; per-checkpoint sensitivity = that checkpoint's existing
+W4A4 ablation ΔNLL ranking.
+
+Per checkpoint: exhaustively evaluate all 2^8 = 256 INT4/INT8 group
+assignments (each group at W4A4 or W8A8, simulation policy v1);
+construct the exact NLL-vs-cost and accuracy-vs-cost Pareto frontiers;
+evaluate sensitivity-ranked and greedy searches (simulated on the
+exhaustive table); compare to random search and exact optima; transfer
+each seed's ranking to the other two checkpoints and measure regret.
+
+Cost model (labeled **estimated**): normalized weight-storage bits —
+cost(config) = Σ_g params(g)·bits(g) / Σ_g params(g)·8; all-INT8 = 1.0,
+all-INT4 = 0.5. Activation bits follow the group but do not enter cost
+(documented simplification; the analytical hardware cost model is a
+later deliverable).
+
+Predeclared primary metrics:
+
+1. **Regret at fixed budget**: NLL(best found with cost ≤ 0.75) −
+   NLL(exact best with cost ≤ 0.75); accuracy regret reported alongside.
+2. **Evaluations to frontier**: number of table evaluations until
+   best-found budget-regret ≤ δ = 0.01 NLL.
+3. **Pareto overlap across checkpoints**: Jaccard similarity of the
+   Pareto-optimal assignment sets, per seed pair.
+4. **Cross-seed rank-transfer regret**: seed A's sensitivity ordering
+   applied as an INT4-flip path on seed B's table; regret at budget 0.75
+   for all 6 ordered pairs.
+5. **Random-search distribution**: 10 deterministic search seeds × 32
+   uniform samples each; distribution of budget-regret.
+
+Search definitions: sensitivity path = start all-INT8, flip groups to
+INT4 in ascending ΔNLL order (9 path points; ranking cost = the 8 prior
+ablation evals, footnoted); greedy = start all-INT8, commit the
+lowest-NLL-increase flip each round (36 evaluations); both simulated
+against the exhaustive table.
+
+Success criteria: the sweep produces a nontrivial precision/quality
+tradeoff, and the search methods are evaluable against exact optima.
+Explicitly NOT required: shared rankings or shared Pareto frontiers
+across checkpoints. Cross-checkpoint transfer is measured, never
+assumed.
