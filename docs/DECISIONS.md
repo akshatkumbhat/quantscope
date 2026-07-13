@@ -221,3 +221,88 @@ change targeting the orientation step — the demonstrated dominant axis;
 (b) accept FP32 ~96% and test whether ranking *stability* (the actual B
 blocker) improves anyway, since per-group W4A4 effects grew at smaller
 freq_step; (c) a different difficulty mechanism entirely.
+
+### ADR-009 addendum 2: option-(b) diagnostic — predeclared interpretation
+
+The frequency-separation phase remains FAILED against its original FP32
+target; this diagnostic answers a *new* question on the untouched dev
+seed 7: did freq_step=0.12 create enough per-group quantization signal
+to justify testing stability directly?
+
+Predeclared (2026-07-13, before seeing the result):
+
+- **Promising** only if the strongest group's ΔNLL ≥ 0.028 (~2x the
+  previous 3-seed max mean of 0.014), AND the top group exceeds the
+  median group by ≥ 0.015, AND prediction flips / accuracy move
+  consistently with the larger NLL effect.
+- One seed cannot test stability; the diagnostic's rank order is not
+  interpreted.
+- If promising: open a prospectively re-scoped validation phase for
+  freq_step=0.12 — recording BEFORE touching seeds 0–2 that FP32 88–94%
+  is a desired property rather than the hard gate, and the decisive gate
+  is 3-seed sensitivity stability — then train and ablate seeds 0–2
+  unchanged.
+- Otherwise (≤ ~0.024 scale, flat, or driven by one anomalous group):
+  reject option (b) and proceed to the scoped orientation-step
+  experiment.
+
+### ADR-009 addendum 3: diagnostic PROMISING — re-scoped validation opened
+
+Diagnostic result (dev seed 7, freq_step=0.12, W4A4 per group): block_b
+ΔNLL +0.0746 (flips 6.0%, accuracy −3.35 pp); stem +0.0108; median
++0.004. Predeclared conditions: top ≥ 0.028 ✓; top − median ≥ 0.015 ✓
+(+0.071); flips/accuracy consistent ✓.
+
+Judgment call on the "one anomalous group" rejection clause, recorded
+with reasons: block_b's dominance is ruled NOT anomalous because (1) it
+was already the top group in the 3-seed ablation at freq_step 0.30, so
+this strengthens an existing pattern, and (2) it is the only group with
+two conv layers and two activation sites — double the quantization
+surface. Caveat: groups ranked 3–8 remain at the old noise scale, so
+full-ranking Spearman may stay weak even if top-group leadership is
+reproducible.
+
+**Pre-registration for the re-scoped validation phase (recorded before
+any seed-0/1/2 run):** FP32 88–94% is now a *desired property*, not the
+hard gate. The decisive gate is **3-seed sensitivity stability**
+(unchanged B2 criteria: meaningful, non-uniform, Spearman ≥ 0.7 in ≥ 2
+of 3 pairs OR existing top-group reproducibility). The
+frequency-separation phase's original FAILED verdict against its FP32
+target stands unamended. Plan: train seeds 0/1/2 at freq_step=0.12 with
+the otherwise-frozen recipe, ablate each, run the unchanged
+check_sensitivity_gate.py.
+
+### ADR-009 addendum 4: re-scoped validation FAILED the decisive gate
+
+3-seed results at freq_step=0.12 (unchanged recipe, unchanged checker):
+
+- FP32 95.7 / 95.4 / 95.0 (mean 95.4%) — desired band still missed
+  (recorded as observation; not the gate).
+- Discrimination intact: W4A4 clearly degraded on every seed; W8A8
+  accuracy inversions of +0.05–0.15 pp on all three seeds (consistent
+  with the known small-effect behavior).
+- **Stability gate FAILED, worse than at 0.30**: Spearman 0.571 / −0.452
+  / 0.071 (0 of 3 pairs ≥ 0.7); top-2 reproduced 1/3. block_b per-seed
+  ΔNLL: +0.0484 / +0.0239 / **−0.0006** — the dev-seed-7 signal
+  (+0.0746) did not replicate; on seed 2 the effect vanished.
+
+Interpretation: the diagnostic's promise was seed luck. Per-group W4A4
+sensitivity at this model scale is dominated by which weight
+configuration a given training run happens to reach, not by
+architecture: the same group swings from the strongest effect to zero
+across seeds. Larger mean effects did not stabilize the ranking.
+
+Disposition: option (b) is exhausted; per pre-registration this phase is
+**FAILED** and work stops for reassessment. Candidate reassessment
+directions (user decision pending): (a) the scoped orientation-step
+generator change (still untried; lowers FP32 into band and raises all
+effect sizes, but freq-step evidence shows bigger effects do not
+automatically stabilize rankings); (b2) reframe the deliverable —
+accept that sensitivity rankings are checkpoint-specific at this scale,
+document that as a finding, and run B3's exhaustive search
+per-checkpoint (search-vs-optimal regret is well-defined per model and
+does not require cross-seed rank stability); (c) a cheap predeclared
+diagnostic first: rerun the ablation at a harsher target (e.g. W3A3) on
+the three existing freq_step=0.12 checkpoints — no retraining — to test
+whether instability is effect-size-limited before any further generator
+work.
