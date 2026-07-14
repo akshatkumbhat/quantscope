@@ -794,3 +794,130 @@ validation checkpoints/seeds 0/1/2 under the ADR-012 design (7σ
 stress per this addendum, addendum-2 mechanism decomposition included,
 no observer-parameter tuning). Robust-observer results were not
 inspected before this pass.
+
+### ADR-012 addendum 6: plan step D results — study complete, Q1
+CONFIRMED (narrow), Q2 non-inferior, Q3 measured; Q4 deferred
+(2026-07-14)
+
+Source of truth: the generated artifacts. Per-seed metrics with
+provenance labels in
+`runs/validation-012/texture-a-seed{0,1,2}-observer-study/metrics.json`;
+cross-seed summary in
+`runs/validation-012/observer-study-summary.json`; stress-design gate
+evidence in `runs/gen-dev6/texture-a-seed6-stress-gate-v3/`. The
+numbers below are transcribed from those artifacts; where a
+transcription and an artifact disagree, the artifact wins.
+
+**Gate history** (all preregistered, none reinterpreted): Gate v1
+(dev seed 7, 6σ/10σ) FAILED on site coverage — the network-wide
+propagation assumption was falsified; behavioral damage passed at both
+magnitudes. Gate v2 (dev seed 8, 6σ, structural early-site criteria)
+FAILED on input expansion, 1.96× vs 2.0×. Gate v3 (dev seed 6, sole
+change 6σ → 7σ, addendum 4) PASSED: input 2.43×, early-site reach 4/4,
+behavioral +0.1925 NLL, pairing intact. D ran only after the v3 pass.
+
+**Execution**: frozen validation checkpoints seeds 0/1/2
+(freq_step=0.12, `runs/validation-012/`); Gate-v3 impulse stress
+(fraction 0.002, 7σ; stress seeds: calibration 1000+seed, evaluation
+2000+seed, probe 3000+seed); frozen observers (MinMax; Percentile
+0.1/99.9; MSE-grid 32 candidates / 0.3 min fraction; PowerOfTwo
+round-up); weights per-channel symmetric MinMax in every arm;
+activation calibration observed the weight-quantized model, matching
+`simulate_quantized` bit-exactly (unit-tested); no observer-parameter
+tuning; single run (`scripts/run_observer_study.py` refuses a rerun).
+
+**Evidence caveats (apply to every number below):**
+
+1. **ReLU-site saturation is not a clipping measure.** Post-ReLU
+   activations are mostly exact zeros, which sit on the `qmin` code
+   under asymmetric unsigned quantization, so the recorded
+   ReLU-site saturation rates (~0.61–0.70 for ALL observers) are
+   dominated by ReLU sparsity, not range clipping.
+   Saturation-based clipping interpretation is therefore restricted
+   to the input site (signed; no zero-pinning artifact). Scale,
+   SQNR, and task metrics remain valid at every site.
+2. **Every W4A4, W8A4, and W8A8 number in D is SIMULATED** —
+   fake-quant simulation policy v1 (FP32 arithmetic with
+   fake-quantized weights/activations), not measured integer
+   execution, and none of it is hardware/NPU performance.
+
+**Q1 — robustness, primary condition (stressed calibration → clean
+evaluation, W4A4): CONFIRMED for both robust observers.**
+
+- Percentile: mean NLL improvement over MinMax **+0.0698**
+  (per seed: 0.0610 / 0.0692 / 0.0791); favorable 3/3; mean accuracy
+  delta **+3.15 pp** (+2.95 / +3.30 / +3.20). Thresholds: > 0.01
+  mean NLL, ≥ 2/3 favorable, accuracy loss ≤ 0.5 pp.
+- MSE-grid: mean NLL improvement **+0.0728**
+  (0.0601 / 0.0723 / 0.0861); favorable 3/3; mean accuracy delta
+  **+3.17 pp** (+2.90 / +3.10 / +3.50).
+- Saturation caveat check (input site only, per caveat 1): under
+  stressed calibration on the clean probe, percentile/MSE-grid clip
+  ≤ 0.10% of clean input values while MinMax clips none — the benefit
+  is not driven by catastrophic saturation at any single site. Input
+  SQNR (A4) rises from 7.4–8.0 dB (MinMax) to 14.8–16.9 dB
+  (percentile) — the mechanism is restored input resolution.
+- W4A4 stressed→clean NLL (clean→clean in parentheses), per seed:
+  - seed 0: minmax 0.2436 (0.1853); percentile 0.1827 (0.1784);
+    mse_grid 0.1836 (0.1757); pow2 0.9185 (0.1930); FP32 clean-eval
+    0.1075 measured.
+  - seed 1: minmax 0.2493 (0.1782); percentile 0.1801 (0.1719);
+    mse_grid 0.1770 (0.1750); pow2 1.6314 (0.2338); FP32 0.1233.
+  - seed 2: minmax 0.2314 (0.1525); percentile 0.1523 (0.1405);
+    mse_grid 0.1453 (0.1410); pow2 1.6453 (0.1569); FP32 0.1284.
+
+**Preregistered scope limitation — the conclusion is narrow:**
+
+> Percentile and MSE-grid observers improve robustness to controlled
+> input-calibration impulse contamination at four-bit activation
+> precision. The mechanism decomposition localizes at least 95% of
+> the MinMax damage to the input observer, so the result does not
+> establish network-wide observer superiority.
+
+Mechanism decomposition (MinMax, W4A4, clean eval; ΔNLL vs clean
+calibration): total damage 0.0584 / 0.0711 / 0.0789 per seed;
+substituting the stressed **input** qparams alone reproduces 0.0696 /
+0.0817 / 0.0751 (≥ 95% of total on every seed; on seeds 0/1 the
+input-only substitution slightly exceeds the full-stress damage, i.e.
+the remaining sites' stressed qparams partially offset it). No single
+ReLU site contributes more than 0.0064. This is
+**input/early-activation calibration robustness**, exactly the
+narrow reading addendum 2 required.
+
+**Q2 — clean-data non-inferiority (0.005 mean-NLL tolerance, per
+configuration, never pooled): non-inferior in all six cells.**
+Mean NLL worse-than-MinMax (negative = better):
+
+- Percentile: W4A4 −0.0084; W8A4 −0.0069; W8A8 +0.0005.
+- MSE-grid: W4A4 −0.0081; W8A4 −0.0076; W8A8 +0.0005.
+
+At W4A4/W8A4 both robust observers are slightly better than MinMax
+even on clean data; at W8A8 the difference is ≤ 0.0008 on every seed.
+
+**Q3 — power-of-two cost (measurement only, round-up mode):**
+
+- clean→clean NLL cost vs MinMax: W4A4 0.0077 / 0.0556 / 0.0044 per
+  seed; W8A4 0.0116 / 0.0665 / 0.0009; W8A8 ≤ 0.001 everywhere.
+- stressed→clean: W4A4 **+0.67 / +1.38 / +1.41**; W8A4 **+1.28 /
+  +2.90 / +1.72**; W8A8 ≤ 0.0013. Round-up doubling of
+  already-inflated MinMax ranges is behaviorally catastrophic at
+  4-bit activations under contaminated calibration — the largest
+  single effect in the study. Power-of-two scale property verified
+  exact in every arm.
+
+**Ranking stability (reported, not gated):** stressed→clean W4A4
+ranking best→worst — seed 0: percentile, mse_grid, minmax, pow2;
+seeds 1 and 2: mse_grid, percentile, minmax, pow2. The robust pair
+swaps first/second across seeds (their NLLs differ by < 0.01); the
+minmax/pow2 tail is stable. Spearman: 0.8 (s0–s1), 0.8 (s0–s2),
+1.0 (s1–s2). Consistent with B's lesson: fine-grained rankings are
+seed-sensitive; the robust-vs-baseline separation is not.
+
+**Q4 (optional, non-gating) — DEFERRED to the optional appendix
+list.** Rationale: it was explicitly non-gating; C already validated
+backend-matched W8A8 arithmetic and lowering; D shows observer-policy
+differences at W8A8 are behaviorally negligible (≤ ~0.001 NLL);
+running it now would add little to the primary conclusions.
+
+**Plan step D is complete.** Next work package: the reporting phase,
+to be separately scoped and approved before work begins.

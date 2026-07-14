@@ -135,17 +135,39 @@ addenda 2–4); B2's checkpoint-conditioned-sensitivity conclusion stands.
   addendum 5). Input expansion 2.43× (≥2.0×), early-site reach 4/4,
   behavioral +0.1925 NLL (9.6× gate), pairing intact. Artifact:
   `runs/gen-dev6/texture-a-seed6-stress-gate-v3/`.
-- [ ] D observer-policy study on validation seeds 0/1/2 (MinMax /
-  percentile 0.1-99.9 / MSE-grid / pow2; W4A4 factorial + W8A4 +
-  W8A8; mechanism decomposition; no observer-parameter tuning).
+- [x] D observer-policy study ran once on validation seeds 0/1/2
+  (ADR-012 addendum 6). **Q1 CONFIRMED for percentile and MSE-grid**
+  in the primary stressed→clean W4A4 condition (mean ΔNLL vs MinMax
+  +0.070 / +0.073, favorable 3/3 seeds, accuracy +3.2 pp) — but the
+  conclusion is narrow: the mechanism decomposition localizes ≥95% of
+  MinMax damage to the input observer, so this is
+  **input/early-activation calibration robustness**, not
+  network-wide observer superiority. Q2 non-inferior in all six
+  cells (robust observers slightly better than MinMax on clean data
+  at A4). Q3: pow2 round-up is catastrophic under stressed
+  calibration at A4 (+0.67 to +2.9 NLL), negligible at W8A8.
+  Ranking stability: robust pair swaps 1st/2nd across seeds;
+  minmax/pow2 tail stable. Evidence caveats recorded: ReLU-site
+  saturation is dominated by exact zeros at qmin (clipping
+  interpretation restricted to the input site); every quantized
+  number is fake-quant simulation policy v1, not integer execution.
+  Artifacts: `runs/validation-012/texture-a-seed{0,1,2}-observer-study/`,
+  `runs/validation-012/observer-study-summary.json` (not committed).
+- [x] Q4 (sim_custom ↔ backend-matched at W8A8) **deferred** to the
+  optional appendix list: non-gating by design; C already validated
+  backend-matched W8A8; D shows W8A8 observer differences ≤ ~0.001
+  NLL; little marginal value now.
+
+**Plan step D is complete.**
 
 ## Next actions
 
-1. Run the D observer-policy study and evaluate Q1/Q2/Q3 under the
-   ADR-012 predeclared interpretation.
-2. Reporting phase: per-checkpoint Pareto plots and the honest
-   findings summary (ADR-010/011 wording).
-3. Optional appendix: W3A3 stress test (still deferred).
+1. Reporting phase: per-checkpoint Pareto plots and the honest
+   findings summary (ADR-010/011/012 wording). Scope to be
+   preregistered/approved separately before work begins.
+2. Optional appendix list (deferred, run only if separately
+   approved): W3A3 stress test; Q4 sim_custom ↔ backend-matched
+   W8A8 comparison.
 
 ## Known observations
 
