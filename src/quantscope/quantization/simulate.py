@@ -49,8 +49,10 @@ __all__ = [
     "GroupSpec",
     "SimQuantConfig",
     "calibrate_activation_params",
+    "quantize_weights_uniform",
     "simulate_quantized",
     "simulate_quantized_groups",
+    "simulate_quantized_with_params",
 ]
 
 logger = logging.getLogger(__name__)
@@ -267,6 +269,54 @@ def simulate_quantized(
         n_layers,
         len(act_params) - 1,
     )
+    return model
+
+
+def quantize_weights_uniform(model: nn.Module, *, bits: int) -> nn.Module:
+    """Deep copy of ``model`` with every Conv2d/Linear weight fake-quantized
+    (per-channel symmetric, policy v1); activations untouched.
+
+    Policy-v1 activation calibration observes the weight-quantized model
+    (:func:`simulate_quantized` does this internally). This public step
+    lets callers calibrate several observer policies against one
+    weight-quantized copy and still match :func:`simulate_quantized`
+    exactly when the parameters are re-attached via
+    :func:`simulate_quantized_with_params`.
+    """
+    model = copy.deepcopy(model).eval()
+    weight_names = [name for name, m in model.named_modules() if isinstance(m, _WEIGHT_MODULES)]
+    _fake_quantize_weights(model, dict.fromkeys(weight_names, bits))
+    return model
+
+
+def simulate_quantized_with_params(
+    model: nn.Module,
+    act_params: Mapping[str, QuantParams],
+    *,
+    weight_bits: int,
+) -> nn.Module:
+    """Policy-v1 simulation from **precomputed** activation parameters.
+
+    Same weight treatment as :func:`simulate_quantized` (uniform
+    per-channel symmetric min-max at ``weight_bits``), but activation
+    fake-quantization uses the caller's ``act_params`` instead of
+    calibrating. This is the ADR-012 mechanism-decomposition entry
+    point: it lets clean- and stressed-calibration parameters be mixed
+    site by site. ``act_params`` must cover the input key and every
+    ReLU site so a silently unquantized site is impossible.
+    """
+    model = copy.deepcopy(model).eval()
+    required = set(_all_relu_sites(model)) | {_INPUT_KEY}
+    if set(act_params) != required:
+        missing = required - set(act_params)
+        extra = set(act_params) - required
+        raise ValueError(
+            f"act_params must cover exactly the policy-v1 sites; missing={sorted(missing)}"
+            f" extra={sorted(extra)}"
+        )
+    weight_names = [name for name, m in model.named_modules() if isinstance(m, _WEIGHT_MODULES)]
+    _fake_quantize_weights(model, dict.fromkeys(weight_names, weight_bits))
+    _attach_fake_quant(model, dict(act_params))
     return model
 
 
