@@ -515,3 +515,119 @@ paths are traceably comparable and every residual difference is
 measured, localized, and explained by two named compatibility findings.
 Optional future work (not required): a float32-division compat mode for
 tie-exact parity, only if D needs it.
+
+## ADR-012: Plan step D — observer-policy comparison study (approved
+with amendments, 2026-07-14)
+
+D isolates one causal question: the same frozen checkpoint and the same
+clean evaluation examples are quantized using activation ranges derived
+from clean versus outlier-contaminated calibration data, with observer
+policy as the only changing quantization factor. `sim_custom`
+(simulation policy v1) enters for the first time. B's conclusions stay
+frozen; C's validated arithmetic is the foundation. No torch observer
+adapter; W3A3 still deferred.
+
+### Design (user amendments incorporated)
+
+1. **No retraining.** The three frozen clean-trained freq_step=0.12
+   checkpoints serve both conditions; retraining on stressed data would
+   change learned representations and confound the calibration
+   comparison. Stress applies only to calibration/evaluation inputs.
+   Stress-trained checkpoints are at most a later optional appendix.
+2. **Paired factorial** (calibration → evaluation): clean→clean,
+   stressed→clean, clean→stressed, stressed→stressed. **Primary
+   condition: stressed calibration → clean evaluation** — rare
+   irrelevant calibration outliers expand MinMax ranges, reducing
+   resolution for ordinary clean inputs.
+3. **One stress mechanism**: impulses only. 0.2% of pixels; signs
+   balanced deterministically; magnitude ±6 per-image standard
+   deviations; injected AFTER blur; labels, base sample IDs, and all
+   texture parameters preserved (stress is applied to the finished
+   clean dataset, so pairing holds by construction). This pairs with
+   the frozen 0.1/99.9 percentile observer: ~0.1% of injected mass per
+   tail gives the clipping level a prospective mechanism-level
+   rationale. Glints are a separately named secondary mechanism, only
+   after the impulse study completes.
+4. **Frozen observers**: MinMax (baseline); Percentile 0.1/99.9;
+   MSE-grid (defaults); PowerOfTwo (round-up). Weights fixed to
+   per-channel symmetric MinMax in every arm. No post-hoc tuning; the
+   percentile stays 0.1/99.9 (0.5/99.5 would decouple the clipping
+   level from the preregistered outlier mass).
+5. **Configurations** (notation: WxAy = x-bit weights, y-bit
+   activations): W4A4 primary discrimination; **W8A4
+   activation-isolation** (observer policy is the independent variable
+   while weights stay high precision); W8A8 backend-like secondary.
+   W4A4 runs the full 4-condition factorial; W8A4/W8A8 run
+   clean→clean and stressed→clean (stressed-evaluation arms added only
+   because they are cheap; secondary).
+6. **Stress-design gate** (dev seed 7's clean-trained checkpoint,
+   before touching validation seeds): (a) stressed calibration expands
+   the observed MinMax range by ≥25% at ≥50% of activation sites —
+   policy v1 has 9 sites (input + 8 ReLUs), so ≥5 of 9; the amendment's
+   "7 of 14" assumed C's FX-graph site count and is adapted
+   proportionally, recorded here; (b) MinMax W4A4 NLL on the unchanged
+   clean evaluation set worsens by > 0.02 under stressed vs clean
+   calibration; (c) labels/sample IDs/non-stress generator values
+   verified identical between paired sets. One mechanical fallback:
+   impulse magnitude 6σ → 10σ, decided ONLY on range expansion and
+   MinMax degradation (never on robust-observer performance). Both
+   levels fail ⇒ stress-design failure, stop.
+7. **Metrics**: ΔNLL and Δaccuracy vs the checkpoint's FP32 (primary:
+   stressed-calib → clean-eval W4A4 ΔNLL); per-site calibrated scales
+   and saturation rates (mechanism evidence); per-site activation SQNR
+   on a fixed held-out probe batch (seed stream +3, NOT the calibration
+   batch, to avoid favoring the observer's fitted distribution),
+   evaluated on both the clean probe and its paired stressed version;
+   power-of-two scale property verified exactly.
+8. **Predeclared interpretation.** Q1 (robustness) confirmed iff, in
+   stressed-calib → clean-eval W4A4: percentile or MSE-grid improves
+   mean NLL over MinMax by > 0.01; direction favorable in ≥ 2 of 3
+   checkpoints; accuracy not worse by > 0.5 pp; and the benefit is not
+   driven by catastrophic saturation at a single site. Q2
+   (non-inferiority) confirmed iff, in clean→clean, no robust observer
+   is worse than MinMax by > 0.005 mean NLL at the same precision
+   configuration (never pooled across configurations). Q3
+   (power-of-two cost) is measurement-only, reported per configuration
+   and per checkpoint. Cross-seed ranking stability is reported, not
+   gated (B's lesson). Negative results get equal prominence.
+9. **Q4 (optional, non-gating)**: sim_custom-MinMax ↔
+   sim_backend_matched at W8A8 with identical calibration inputs;
+   differences attributed explicitly to observer range-selection
+   policy, graph placement, or arithmetic policy. Must not delay the
+   primary study.
+
+### ADR-012 addendum: stress-design gate FAILED on criterion (a) —
+stopped before validation seeds (2026-07-14)
+
+Dev-seed-7 results (`scripts/check_stress_gate.py`):
+
+| criterion | 6σ | 10σ (fallback) |
+| --- | --- | --- |
+| (a) ≥25% MinMax scale expansion at ≥5/9 sites | **4/9 — FAIL** | **4/9 — FAIL** |
+| (b) MinMax W4A4 NLL degradation > 0.02 (clean eval) | +0.0920 — pass | +0.6864 — pass |
+| (c) pairing identity | pass | pass |
+
+Per-site pattern (10σ): input 3.14×, stem 2.85×, block_a.relu1 2.60×,
+block_a.relu_out 2.15×, down_relu 1.23× (just under threshold), all
+deeper sites exactly 1.00×.
+
+Localization: the *mechanism* works — stressed calibration destroys
+MinMax resolution for clean inputs (criterion (b) exceeded by 4.6× at
+6σ and 34× at 10σ). What fails is the **site-coverage expectation**
+encoded in criterion (a): isolated impulses are spatially attenuated by
+convolution and downsampling, so ranges beyond the first block never
+inflate, regardless of magnitude. Raising magnitude amplifies early
+sites (already far past threshold) without propagating depth-wise.
+Criterion (a) assumed outliers reach most of the network; CNNs
+structurally prevent that for pixel impulses.
+
+Disposition: per the pre-registered protocol (both magnitude levels
+exhausted), **stress-design failure recorded; D stopped before the
+validation seeds.** No threshold was adjusted after seeing results.
+Reassessment options (user decision): (i) accept failure and close D;
+(ii) prospectively amend criterion (a) with the attenuation rationale
+(e.g. require expansion only at the sites where impulses physically
+survive) and rerun the gate as a new decision; (iii) switch to the
+glint mechanism (larger spatial footprint; plausibly survives
+downsampling and inflates deeper sites) as the separately named
+secondary stress, promoted with its own gate.

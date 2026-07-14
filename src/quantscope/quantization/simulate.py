@@ -35,7 +35,7 @@ import torch
 from torch import nn
 from torch.utils.data import DataLoader, Dataset
 
-from quantscope.observers import MinMaxObserver
+from quantscope.observers import CalibrationObserver, MinMaxObserver
 from quantscope.quantization.affine import (
     Granularity,
     QuantParams,
@@ -48,6 +48,7 @@ __all__ = [
     "BOTTLENECK_RESNET_GROUPS",
     "GroupSpec",
     "SimQuantConfig",
+    "calibrate_activation_params",
     "simulate_quantized",
     "simulate_quantized_groups",
 ]
@@ -142,14 +143,19 @@ def _calibrate_activations(
     bits_by_site: Mapping[str, int],
     input_bits: int | None,
     batch_size: int,
+    observer_factory: type[CalibrationObserver] = MinMaxObserver,
 ) -> dict[str, QuantParams]:
-    """Observe the selected ReLU outputs (and optionally the input)."""
-    observers: dict[str, MinMaxObserver] = {
-        name: MinMaxObserver(bits=bits, signed=False, scheme=Scheme.ASYMMETRIC)
+    """Observe the selected ReLU outputs (and optionally the input).
+
+    ``observer_factory`` selects the activation calibration policy
+    (ADR-012); weights are never affected by it.
+    """
+    observers: dict[str, CalibrationObserver] = {
+        name: observer_factory(bits=bits, signed=False, scheme=Scheme.ASYMMETRIC)
         for name, bits in bits_by_site.items()
     }
     if input_bits is not None:
-        observers[_INPUT_KEY] = MinMaxObserver(
+        observers[_INPUT_KEY] = observer_factory(
             bits=input_bits, signed=True, scheme=Scheme.ASYMMETRIC
         )
 
@@ -202,18 +208,45 @@ def _attach_fake_quant(model: nn.Module, act_params: dict[str, QuantParams]) -> 
         model.register_forward_pre_hook(lambda _mod, inp: (_fq(inp[0], input_params), *inp[1:]))
 
 
+def calibrate_activation_params(
+    model: nn.Module,
+    calibration: Dataset,
+    *,
+    bits: int,
+    batch_size: int = 64,
+    observer_factory: type[CalibrationObserver] = MinMaxObserver,
+) -> dict[str, QuantParams]:
+    """Public policy-v1 activation calibration (input + all ReLU sites).
+
+    Used by the ADR-012 observer study to inspect per-site scales and
+    ranges without building a full simulated model.
+    """
+    sites = _all_relu_sites(model)
+    return _calibrate_activations(
+        model,
+        calibration,
+        bits_by_site=dict.fromkeys(sites, bits),
+        input_bits=bits,
+        batch_size=batch_size,
+        observer_factory=observer_factory,
+    )
+
+
 def simulate_quantized(
     model: nn.Module,
     calibration: Dataset,
     config: SimQuantConfig,
     *,
     batch_size: int = 64,
+    observer_factory: type[CalibrationObserver] = MinMaxObserver,
 ) -> nn.Module:
     """Uniform simulated quantization of the whole model (policy v1).
 
     The original model is untouched. The returned deep copy runs FP32
     arithmetic with fake-quantized weights and activations — a
-    **simulation**, not integer execution.
+    **simulation**, not integer execution. ``observer_factory`` varies
+    the activation calibration policy only (ADR-012); weights always use
+    per-channel symmetric min-max.
     """
     model = copy.deepcopy(model).eval()
     weight_names = [name for name, m in model.named_modules() if isinstance(m, _WEIGHT_MODULES)]
@@ -225,6 +258,7 @@ def simulate_quantized(
         bits_by_site=dict.fromkeys(sites, config.act_bits),
         input_bits=config.act_bits,
         batch_size=batch_size,
+        observer_factory=observer_factory,
     )
     _attach_fake_quant(model, act_params)
     logger.info(
