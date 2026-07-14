@@ -129,21 +129,23 @@ addenda 2–4); B2's checkpoint-conditioned-sensitivity conclusion stands.
   `quantscope.analysis.stress_gate` with unit tests; runner
   `scripts/check_stress_gate_v3.py` writes a labeled artifact and
   refuses a second attempt.
-- [ ] Train the seed-6 FP32 dev checkpoint (`runs/gen-dev6/`, frozen
-  0.12 recipe) and execute Gate v3 once.
-- [ ] Pass ⇒ D observer study on validation seeds 0/1/2; fail ⇒ close
-  the impulse stress family for this phase and stop for a decision.
+- [x] Seed-6 FP32 dev checkpoint trained (`runs/gen-dev6/`, frozen
+  0.12 recipe; FP32 95.1% measured).
+- [x] Impulse Stress Gate v3 executed once: **PASSED** (ADR-012
+  addendum 5). Input expansion 2.43× (≥2.0×), early-site reach 4/4,
+  behavioral +0.1925 NLL (9.6× gate), pairing intact. Artifact:
+  `runs/gen-dev6/texture-a-seed6-stress-gate-v3/`.
+- [ ] D observer-policy study on validation seeds 0/1/2 (MinMax /
+  percentile 0.1-99.9 / MSE-grid / pow2; W4A4 factorial + W8A4 +
+  W8A8; mechanism decomposition; no observer-parameter tuning).
 
 ## Next actions
 
-1. Execute Impulse Stress Gate v3 (after committing the
-   preregistration) and record the verdict.
-2. Conditional on the gate: D observer-policy study (MinMax /
-   percentile 0.1-99.9 / MSE-grid / pow2; W4A4 factorial + W8A4 +
-   W8A8; mechanism decomposition) on seeds 0/1/2.
-3. Reporting phase: per-checkpoint Pareto plots and the honest
+1. Run the D observer-policy study and evaluate Q1/Q2/Q3 under the
+   ADR-012 predeclared interpretation.
+2. Reporting phase: per-checkpoint Pareto plots and the honest
    findings summary (ADR-010/011 wording).
-4. Optional appendix: W3A3 stress test (still deferred).
+3. Optional appendix: W3A3 stress test (still deferred).
 
 ## Known observations
 

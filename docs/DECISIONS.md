@@ -766,3 +766,31 @@ seeds 0/1/2 (ADR-012 design incl. the addendum-2 mechanism
 decomposition). Fail ⇒ the impulse stress family is closed permanently
 for this phase; stop and report (no automatic switch to glints, no
 amended thresholds, no custom-observer runs).
+
+### ADR-012 addendum 5: Gate v3 result — PASSED (2026-07-14)
+
+Fresh dev seed 6 (FP32 95.1% measured), 7σ, single attempt,
+`scripts/check_stress_gate_v3.py`, artifact
+`runs/gen-dev6/texture-a-seed6-stress-gate-v3/`:
+
+- Early-site reach: **4/4** sites ≥ 1.25× (needed ≥3) — pass
+  (input 2.43×, stem_relu 2.18×, block_a.relu1 1.57×,
+  block_a.relu_out 1.40×; down_relu 1.23× and all deeper sites ≤1.01×,
+  consistent with the v1 attenuation finding).
+- Input expansion: **2.43× vs required 2.0× — PASS.** Implied clean
+  calibration extreme ≈ 7/2.43 ≈ 2.88σ on the seed-6 split (vs 3.06σ
+  on seed 8) — the 7σ arithmetic held with margin.
+- Behavioral: NLL degradation **+0.1925** (gate 0.02; 9.6×) — pass.
+  Accuracy −5.00 pp, prediction flips 8.20% (reported, not gated).
+- Pairing — pass (labels identical; changed-pixel fraction 0.00195).
+
+Verdict computed by the preregistered `GATE_V3_SPEC` criteria with no
+adjustment. Cross-gate mechanism record: behavioral damage has now
+exceeded its threshold in four independent runs (seed 7 at 6σ: 4.6×;
+seed 7 at 10σ: 34×; seed 8 at 6σ: 5.6×; seed 6 at 7σ: 9.6×).
+
+Disposition: **proceed to the approved D observer-policy study** on
+validation checkpoints/seeds 0/1/2 under the ADR-012 design (7σ
+stress per this addendum, addendum-2 mechanism decomposition included,
+no observer-parameter tuning). Robust-observer results were not
+inspected before this pass.
