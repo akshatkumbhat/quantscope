@@ -631,3 +631,74 @@ survive) and rerun the gate as a new decision; (iii) switch to the
 glint mechanism (larger spatial footprint; plausibly survives
 downsampling and inflates deeper sites) as the separately named
 secondary stress, promoted with its own gate.
+
+### ADR-012 addendum 2: Impulse Stress Gate v2 (pre-registered
+2026-07-14, before the fresh dev run)
+
+Original gate result stands unchanged: the propagation-coverage
+criterion failed at both magnitudes; its assumption that isolated
+impulses should expand ranges throughout the CNN was **falsified**; no
+validation checkpoint was examined. Downstream attenuation is recorded
+as a mechanism finding, not a failure: *pixel impulses strongly
+contaminate input and early-layer calibration ranges but are attenuated
+by convolution and pooling before deeper observer sites; early-layer
+range contamination alone is sufficient to damage end-to-end W4A4
+performance.* Glints are NOT promoted; they remain a separately
+preregistered stress family considered only if v2 fails.
+
+v2 reflects the actual causal requirement — calibration outliers must
+materially distort the ranges that physically survive, and must damage
+clean-input quantized performance; they need not reach most sites.
+
+- **Fresh evidence base**: a newly trained dev checkpoint (seed 8,
+  frozen 0.12 recipe) — not the seed-7 results that motivated this
+  amendment. Stress fixed at **6σ** (the +0.092 NLL effect at 6σ was
+  already ample; 10σ is unnecessarily extreme).
+- **Criterion 1 — early-site reach** (structural definition fixed
+  before running): eligible sites are the input plus the activation
+  observers before the first spatial downsampling boundary
+  (`down_conv`, stride 2) — i.e. `__input__`, `stem_relu`,
+  `block_a.relu1`, `block_a.relu_out`. Require ≥3 of these 4 to show a
+  MinMax scale increase ≥25%, and the input ≥2×.
+- **Criterion 2 — behavioral discrimination**: stressed-calib →
+  clean-eval MinMax W4A4 NLL worse by > 0.02 vs clean-calib →
+  clean-eval. Accuracy and prediction flips reported, not gated.
+- **Criterion 3 — pairing integrity**: labels, sample IDs, base
+  textures, non-stress generator parameters exactly equal.
+- **Criterion 4 — no observer shopping**: the gate inspects MinMax
+  only; percentile/MSE-grid/pow2 results stay hidden until the stress
+  design passes.
+- **Mechanism decomposition added to the final D study**: starting from
+  clean-calibration qparams, substitute stressed qparams one site at a
+  time and cumulatively by stage (input / remaining early sites /
+  deeper sites), attributing the MinMax NLL damage. If nearly all
+  damage is the input observer, the result is reported specifically as
+  **input/early-activation calibration robustness**, never
+  network-wide observer robustness.
+- Pass ⇒ proceed to validation seeds under the existing D comparison.
+  Fail ⇒ close the impulse mechanism; consider glints as a separately
+  preregistered family.
+
+### ADR-012 addendum 3: Gate v2 result — FAILED on input expansion
+(2026-07-14)
+
+Fresh dev seed 8 (FP32 94.0%), 6σ, `scripts/check_stress_gate_v2.py`:
+
+- Early-site reach: **4/4** sites ≥ 1.25× (needed ≥3) — pass.
+- Input expansion: **1.96× vs required 2.0× — FAIL by 0.04.**
+- Behavioral: NLL degradation **+0.1127** (gate 0.02; 5.6×) — pass.
+  Accuracy −3.15 pp, prediction flips 7.05% (reported).
+- Pairing — pass.
+
+Mechanistic reading of the miss: the input MinMax ratio is bounded by
+(impulse magnitude)/(clean input extreme) = 6σ_img / ~3.06σ_img ≈ 1.96.
+The 2× requirement implicitly assumed clean input extremes ≤ 3σ; the
+actual calibration extremes are ~3.06σ. The failure is arithmetic
+tension between two preregistered numbers (6σ impulses, 2× input
+expansion), not a failure of the contamination mechanism, which has now
+exceeded its behavioral threshold in three independent runs (seed 7 at
+6σ: 4.6×; seed 7 at 10σ: 34×; seed 8 at 6σ: 5.6×).
+
+Disposition: v2 recorded FAILED as written; no threshold adjusted after
+data. Per pre-registration the impulse mechanism is closed pending the
+user's decision on next steps.
