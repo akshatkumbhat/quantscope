@@ -141,22 +141,33 @@ def _minmax_params(
     high: np.ndarray,
     int_range: IntegerRange,
     scheme: Scheme,
+    policy: str = "quantscope",
 ) -> tuple[np.ndarray, np.ndarray]:
     """Compute (scale, zero_point) arrays from per-slice min/max arrays.
 
     A constant or all-zero slice yields ``scale = 1.0, zero_point = 0``
     (any scale reconstructs a constant exactly through the zero point),
     documented rather than silent: the range is genuinely empty.
+
+    ``policy`` selects the symmetric-scale convention (ADR-011):
+        - ``"quantscope"``: scale = bound / (qmax - zp), e.g. /127 for
+          INT8 — the positive extreme maps exactly to qmax.
+        - ``"torch_2_2"``: scale = bound / ((qmax - qmin) / 2), e.g.
+          /127.5 for INT8 — Torch 2.2.2 compatibility; systematically
+          ~0.39% smaller scales for INT8. Asymmetric is identical in
+          both policies.
     """
+    if policy not in ("quantscope", "torch_2_2"):
+        raise ValueError(f"unknown qparam policy: {policy!r}")
     qmin, qmax = int_range.qmin, int_range.qmax
     if scheme is Scheme.SYMMETRIC:
         bound = np.maximum(np.abs(low), np.abs(high)).astype(np.float64)
         # Zero point: 0 for signed, mid-range for unsigned symmetric.
         zp = 0 if int_range.signed else (qmax + qmin + 1) // 2
-        # Scale divides by the positive half-range (qmax - zp), matching the
-        # common convention (e.g. PyTorch): both ±bound stay representable;
-        # the most negative code may go unused rather than saturating +bound.
-        half_range = float(qmax - zp)
+        # quantscope: divide by the positive half-range (qmax - zp) so both
+        # ±bound stay representable. torch_2_2: divide by the full-range
+        # midpoint, matching Torch 2.2.2 (see docstring).
+        half_range = (qmax - qmin) / 2.0 if policy == "torch_2_2" else float(qmax - zp)
         degenerate = bound <= _EPS
         scale = np.where(degenerate, 1.0, bound / half_range)
         zero_point = np.full_like(scale, zp, dtype=np.int32)
@@ -185,6 +196,7 @@ def compute_quant_params(
     granularity: Granularity = Granularity.PER_TENSOR,
     channel_axis: int | None = None,
     narrow_range: bool = False,
+    qparam_policy: str = "quantscope",
 ) -> QuantParams:
     """Compute affine quantization parameters from observed values.
 
@@ -196,6 +208,8 @@ def compute_quant_params(
         granularity: per-tensor or per-channel.
         channel_axis: required axis for per-channel granularity.
         narrow_range: drop the most negative signed value.
+        qparam_policy: symmetric-scale convention; "quantscope" (default)
+            or "torch_2_2" compatibility (see _minmax_params, ADR-011).
 
     Raises:
         ValueError: for empty input, NaN/infinite input, invalid bit width,
@@ -212,7 +226,7 @@ def compute_quant_params(
             raise ValueError("channel_axis is only valid for per-channel granularity")
         low = np.asarray(values.min())
         high = np.asarray(values.max())
-        scale, zero_point = _minmax_params(low, high, int_range, scheme)
+        scale, zero_point = _minmax_params(low, high, int_range, scheme, qparam_policy)
         scale, zero_point = scale.reshape(()), zero_point.reshape(())
     else:
         if channel_axis is None:
@@ -223,7 +237,7 @@ def compute_quant_params(
         reduce_axes = tuple(ax for ax in range(values.ndim) if ax != channel_axis)
         low = values.min(axis=reduce_axes)
         high = values.max(axis=reduce_axes)
-        scale, zero_point = _minmax_params(low, high, int_range, scheme)
+        scale, zero_point = _minmax_params(low, high, int_range, scheme, qparam_policy)
 
     return QuantParams(
         scale=scale,

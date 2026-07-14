@@ -97,15 +97,24 @@ against that target. A later diagnostic + pre-registered re-scoped
 validation at 0.12 also failed the decisive stability gate (ADR-009
 addenda 2–4); B2's checkpoint-conditioned-sensitivity conclusion stands.
 
+## C status (2026-07-13)
+
+- [x] C: graph-anchored backend parity — **PASS on all 3 checkpoints**
+  (ADR-011 + addendum). qparams exact under torch_2_2 policy; strict
+  sim↔reference residuals fully localized to float32-vs-float64
+  rounding-tie resolution (integer final-code steps; ≤0.5%
+  prediction disagreement; accuracy/NLL aligned); reference↔real-INT8
+  prediction disagreement 0.0000 on every seed. Two named
+  compatibility findings recorded (127.5-vs-127 symmetric scale;
+  division-precision tie resolution, systematic at requant nodes).
+
 ## Next actions
 
-1. Plan step C (backend-matched simulation profile +
-   convert_to_reference_fx + real INT8 comparison ladder) — next
-   deliverable per the accepted plan.
-2. Optional later appendix: W3A3 stress test (explicitly not a rescue
-   of the failed W4A4 stability criterion).
+1. Plan step D: observer-policy comparison study (sim_custom enters;
+   outlier stress variant; percentile/pow2/MSE observers vs min-max).
+2. Optional appendix: W3A3 stress test.
 3. Reporting phase: per-checkpoint Pareto plots and the honest
-   findings summary (ADR-010 addendum wording).
+   findings summary (ADR-010/011 wording).
 2. B3 (exhaustive search) remains deferred until a stable ranking
    exists.
 

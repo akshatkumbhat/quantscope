@@ -146,6 +146,39 @@ def sweep(
 
 
 @app.command()
+def backend_parity(
+    seed: int = typer.Option(0, "--seed"),
+    runs_dir: str = typer.Option("runs/validation-012", "--runs-dir"),
+    freq_step: float = typer.Option(0.12, "--freq-step"),
+) -> None:
+    """Staged backend-parity ladder: graph-anchored sim vs reference-FX vs real INT8."""
+    from quantscope.benchmark import benchmark_config, texture10_calibration
+    from quantscope.data.synthetic import build_datasets
+    from quantscope.quantization.parity import run_backend_parity
+
+    config = benchmark_config(seed=seed, output_dir=runs_dir, freq_step=freq_step)
+    checkpoint = Path(runs_dir) / f"texture-a-seed{seed}-fp32" / "model.pt"
+    calibration = texture10_calibration(config)
+    _, test_set = build_datasets(config.data, config.model)
+    results = run_backend_parity(config, calibration, test_set, checkpoint=checkpoint)
+
+    for stage in (
+        "stage3_activation_only",
+        "stage4_weight_only",
+        "stage5_strict",
+        "backend_comparison",
+    ):
+        r = results[stage]
+        typer.echo(
+            f"{stage}: disagree={r['prediction_disagreement']:.4f} "
+            f"maxdiff={r['per_sample_max_absdiff_max']:.2e} sqnr={r['sqnr_db']:.1f}dB"
+        )
+    for name in ("sim_full", "reference_fx", "real_int8"):
+        ev = results[f"{name}_eval"]
+        typer.echo(f"{name}: accuracy={ev['accuracy']:.4f} nll={ev['nll']:.4f}")
+
+
+@app.command()
 def texture_bench(
     seed: int = typer.Option(0, "--seed"),
     epochs: int = typer.Option(35, "--epochs"),

@@ -402,3 +402,116 @@ one-shot ablation sensitivity rankings are NOT a reliable guide even on
 the checkpoint they were measured on, and neither rankings nor Pareto
 sets transfer across training runs. All quality metrics simulated;
 costs estimated; no claim generalizes beyond this benchmark and scale.
+
+## ADR-011: Plan step C — graph-anchored backend parity (2026-07-13)
+
+C is an independent numerical-validity phase; it does not support the
+failed sensitivity heuristic (B conclusions frozen as recorded).
+
+**Comparison ladder:** `sim_backend_matched` ↔ `reference_fx` ↔
+`real_int8`. `sim_custom` (policy v1) stays out of the parity gate
+until D. One frozen checkpoint (seed 0, freq_step=0.12) first; expand
+only if it passes and reruns are cheap.
+
+**Construction (user-selected option B): the graph-anchored
+backend-matched simulator** — hold Torch's fusion, placement,
+calibration statistics, and graph topology constant while replacing
+Torch's affine quantize/dequantize arithmetic with QuantScope's.
+Activations: deep-copy the calibrated prepare_fx model, freeze each
+activation observer's searched range, and swap the observer for a
+non-updating `FrozenQuantScopeFakeQuant` powered by the affine core.
+Weights: instantiate the configured Torch weight observer per fused
+weighted module (matching conversion behavior), extract per-channel
+ranges, fake-quantize the folded weight with QuantScope arithmetic,
+bias stays FP32, fused structure preserved. Torch's `FakeQuantize`
+module is NOT used in the primary comparison (it would validate Torch
+against Torch).
+
+**Inspected Torch 2.2.2 defaults (measured, not assumed):** engine
+fbgemm; activations HistogramObserver, quint8, per-tensor affine,
+quant range [0, 127] (reduce_range=True); weights
+PerChannelMinMaxObserver, qint8, per-channel symmetric, [-128, 127],
+ch_axis 0; 14 activation observer sites on the fused BottleneckResNet
+graph; BN fully folded (ConvReLU2d fusions). Confirmed: Torch 2.2.2
+symmetric scale = max_abs / ((quant_max − quant_min)/2) — denominator
+127.5, vs QuantScope's qmax − zp = 127. QuantScope's general semantics
+are NOT silently changed: a `qparam_policy="torch_2_2"` compatibility
+mode is added, and the artifact shows both calculations and their
+~0.39% systematic difference as a compatibility finding.
+
+`HistogramObserver._non_linear_param_search()` (private, version-
+pinned) is contained behind one extractor with a torch-version
+assertion and a characterization test (qparams from extracted bounds
+must equal `calculate_qparams()`); both raw histogram extent and
+searched extent are recorded. Nothing else in QuantScope may touch the
+private method.
+
+**Staged comparisons (failures stay localized):** (1) qparam parity at
+all 14 activation sites and every weight channel (exact equality, max
+abs diff, relative scale diff); (2) primitive fake-quant parity on
+captured tensors vs Torch's fake-quant ops with identical frozen
+qparams — integer codes and dequantized values, including halfway,
+saturation, zero, constant-range, and negative cases; (3) activation-
+only model parity; (4) weight-only model parity; (5) full simulation vs
+`convert_to_reference_fx`; then reference_fx ↔ convert_fx real INT8.
+
+**Recorded per path:** accuracy, NLL, prediction disagreement rate,
+logit MSE/SQNR/cosine/max-abs, per-sample logit differences, scale/
+zero-point metadata, quantized-node coverage and float islands, and
+prepared/reference/backend graph summaries. Identical checkpoint,
+calibration sample IDs and order, eval set, preprocessing, and fused
+model across all paths.
+
+**Tiered acceptance:** sim ↔ reference is the strict gate (differences
+mean a semantic mismatch to localize); reference ↔ real INT8 tolerates
+small numerical differences but must stay materially aligned in
+accuracy/NLL/predictions. Any mismatch must be localized with evidence
+— never attributed generically to "kernel differences". Success does
+not require bit-exact equality or an INT8 accuracy drop. Option A
+(independent end-to-end simulator with own fusion/placement) is a
+separately-named later test and never shares C's strict gate. W3A3
+deferred; no custom Torch observer adapter in C.
+
+### ADR-011 addendum: C results — PASS on all 3 checkpoints (2026-07-13)
+
+**Stage 1 (qparam parity):** exact. Activation scales match to ≤1e-7
+relative (float32 representation), all zero points equal; weight scales
+bit-exact under `qparam_policy="torch_2_2"` at all 9 sites, zero points
+equal. The native-policy comparison shows the predicted uniform
+127.5/127 ratio (1.00394) at every weight site — compatibility finding
+#1, shown in the artifact, both calculations recorded.
+
+**Stage 2 (primitive parity):** 3–4 code mismatches per ~6.3M captured
+elements per seed, each exactly one code, each at a float32 .5
+rounding-tie boundary — compatibility finding #2: **Torch quantizes
+with float32 division; QuantScope uses float64**, so exact ties resolve
+differently (characterized in unit tests; core semantics unchanged by
+policy discipline).
+
+**Stages 3–5 + backend:** activation-only and weight-only diagnostics
+show 0 (one seed 0.05%) prediction disagreement and 56–65 dB logit
+SQNR. Strict gate (sim_full ↔ reference_fx): prediction disagreement
+0.15% / 0.15% / 0.50%; logit SQNR ~35 dB; residuals decompose into
+**integer multiples of the final logit quantization scale** (~95% of
+samples differ by exactly one final code; rare tails to 7 codes from an
+upstream tie amplified through subsequent layers; max fractional
+deviation from integer 0.0069). Root cause: chained quantized ops emit
+lattice-aligned values, making division ties *systematic* at
+requantization nodes rather than rare — the same finding #2, amplified
+by graph structure. Accuracy/NLL materially aligned (Δaccuracy ≤ 0.1
+pp, ΔNLL ≤ 1.2e-3). Backend gate (reference_fx ↔ real_int8):
+**0.0000 prediction disagreement on all three seeds**, accuracy/NLL
+identical to 4 decimals, SQNR 52–56 dB.
+
+**Graph coverage (recorded per artifact):** reference graph 73 nodes
+with 28 quantize/dequantize nodes; float islands = the two residual
+adds and flatten (adds execute in float between dq/q pairs, as expected
+for this qconfig); lowered INT8 graph 23 nodes, 4 q/dq boundary nodes,
+quantized fused modules, only flatten in float. All 9 weighted modules
+quantized in both converted paths.
+
+**Verdict:** C succeeds under its predeclared criteria — the three
+paths are traceably comparable and every residual difference is
+measured, localized, and explained by two named compatibility findings.
+Optional future work (not required): a float32-division compat mode for
+tie-exact parity, only if D needs it.
