@@ -362,3 +362,43 @@ tradeoff, and the search methods are evaluable against exact optima.
 Explicitly NOT required: shared rankings or shared Pareto frontiers
 across checkpoints. Cross-checkpoint transfer is measured, never
 assumed.
+
+### ADR-010 addendum: B3 results (2026-07-13)
+
+Methodological success criteria: **met.** Nontrivial tradeoff (budget-
+feasible NLL spreads 0.029–0.062, all » δ=0.01; frontiers of 15–18
+points, 14–16 of them mixed-precision) and every search evaluated
+against exact optima.
+
+Substantive results, reported per the two predeclared questions:
+
+**Q1 — within-checkpoint utility: NEGATIVE.** The ablation-ranked
+single path (flip groups to INT4 in ascending ΔNLL order) had budget
+regret 0.0465 / 0.0338 / 0.0036 across seeds and never came within δ of
+the frontier on seeds 0–1. Greedy search (36 evals, measures joint
+effects incrementally) reached regret 0.0095 / 0.0025 / 0.0009 in
+21 / 6 / 6 evaluations. Random search (32 evals) had median regret
+0.0035 / 0.0018 / 0.0011 — **beating the sensitivity path on every seed
+and matching or beating greedy.** The hoped-for finding ("a ranking
+measured on a checkpoint still guides search for that checkpoint") is
+NOT supported: one-at-a-time W4A4 ablation effects do not compose
+additively into joint mixed-precision quality; interaction effects
+dominate. Caveat recorded: 32 random samples cover 12.5% of this
+256-point space — random search would not scale this way to larger
+spaces; the predeclared design nevertheless stands as run.
+
+**Q2 — cross-checkpoint transfer: erratic, consistent with weakly
+informative rankings.** Transfer penalties ranged from +0.0222 to
+−0.0411; seed 2's ranking outperformed seeds 0 and 1's *own* rankings
+on their own tables — a foreign ranking beating the native one is
+further evidence the rankings are noise-dominated. Pareto-frontier
+overlap across checkpoints is small (Jaccard 0.065–0.161): the optimal
+mixed-precision assignments are also checkpoint-specific.
+
+Honest summary for the report/README: at this model scale, exhaustive
+enumeration shows (a) mixed-precision tradeoffs are real and per-
+checkpoint optima exist; (b) greedy joint-effect search works; (c)
+one-shot ablation sensitivity rankings are NOT a reliable guide even on
+the checkpoint they were measured on, and neither rankings nor Pareto
+sets transfer across training runs. All quality metrics simulated;
+costs estimated; no claim generalizes beyond this benchmark and scale.

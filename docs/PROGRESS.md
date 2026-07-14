@@ -80,23 +80,32 @@ None.
   **STOP before C** (ADR-008 addendum 3). Sensitivity is meaningful
   (max mean ΔNLL +0.014) and non-uniform (max/median 3.76) but
   unstable across seeds (Spearman ≤ 0.405; top-2 reproduced 1/3).
-- [ ] B3 (exhaustive 256-config search): deferred until a stable
-  ranking exists.
+- [x] B3 (reframed deliverable, ADR-010): exhaustive 256-config sweeps
+  on all three freq_step=0.12 checkpoints; exact Pareto frontiers;
+  predeclared search analysis. **Methodological success; substantive
+  negative finding**: one-shot ablation rankings did not guide search
+  even within their own checkpoint (random 32-eval search beat the
+  sensitivity path on all seeds; greedy joint-effect search worked);
+  Pareto sets barely overlap across checkpoints (Jaccard 0.065–0.161).
 
 ## Generator phase status (2026-07-12)
 
 FAILED at candidate screening (ADR-009 addendum). freq_step candidates
 0.20/0.15/0.12 on dev seed 7 all left FP32 at ~96% (target ~90-93%);
-the 18° orientation step dominates class identity. No candidate frozen,
-3-seed validation not run. freq_step remains parametrized (default
-0.30) for any future approved change.
+the 18° orientation step dominates class identity. No candidate frozen
+against that target. A later diagnostic + pre-registered re-scoped
+validation at 0.12 also failed the decisive stability gate (ADR-009
+addenda 2–4); B2's checkpoint-conditioned-sensitivity conclusion stands.
 
 ## Next actions
 
-1. Await reassessment decision: (a) scoped orientation-step change;
-   (b) accept FP32 ~96% and test whether per-group ranking stability
-   improves at small freq_step (W4A4 effects grew there); or
-   (c) different difficulty mechanism.
+1. Plan step C (backend-matched simulation profile +
+   convert_to_reference_fx + real INT8 comparison ladder) — next
+   deliverable per the accepted plan.
+2. Optional later appendix: W3A3 stress test (explicitly not a rescue
+   of the failed W4A4 stability criterion).
+3. Reporting phase: per-checkpoint Pareto plots and the honest
+   findings summary (ADR-010 addendum wording).
 2. B3 (exhaustive search) remains deferred until a stable ranking
    exists.
 
