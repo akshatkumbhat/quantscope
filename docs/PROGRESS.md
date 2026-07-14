@@ -108,15 +108,42 @@ addenda 2–4); B2's checkpoint-conditioned-sensitivity conclusion stands.
   compatibility findings recorded (127.5-vs-127 symmetric scale;
   division-precision tie resolution, systematic at requant nodes).
 
+## D status (2026-07-14)
+
+- [x] ADR-012 approved: observer-policy comparison study design
+  (stress-design gate before validation seeds).
+- [x] Stress-design Gate v1 (dev seed 7): **FAILED** on site coverage
+  at both 6σ and 10σ (ADR-012 addendum). Mechanism finding: pixel
+  impulses contaminate input/early ranges but attenuate before deeper
+  sites; behavioral damage criterion passed at both magnitudes.
+- [x] Impulse Stress Gate v2 (fresh dev seed 8, 6σ, preregistered
+  ADR-012 addendum 2): **FAILED** on input expansion, 1.96× vs 2.0×
+  (addendum 3). Behavioral criterion passed 5.6× over gate. Diagnosis:
+  arithmetic tension between 6σ impulses and ~3.06σ clean-input
+  extremes. Recorded failed as written; no post-hoc adjustment.
+- [x] User decision: continue the impulse family with **Gate v3**,
+  preregistered as ADR-012 addendum 4 — sole change 6σ → 7σ, 2.0×
+  input threshold retained, fresh dev seed 6 (lowest unused seed whose
+  streams touch no validation material), stress seed 1006, one attempt
+  only, no fallback. Gate logic extracted to
+  `quantscope.analysis.stress_gate` with unit tests; runner
+  `scripts/check_stress_gate_v3.py` writes a labeled artifact and
+  refuses a second attempt.
+- [ ] Train the seed-6 FP32 dev checkpoint (`runs/gen-dev6/`, frozen
+  0.12 recipe) and execute Gate v3 once.
+- [ ] Pass ⇒ D observer study on validation seeds 0/1/2; fail ⇒ close
+  the impulse stress family for this phase and stop for a decision.
+
 ## Next actions
 
-1. Plan step D: observer-policy comparison study (sim_custom enters;
-   outlier stress variant; percentile/pow2/MSE observers vs min-max).
-2. Optional appendix: W3A3 stress test.
+1. Execute Impulse Stress Gate v3 (after committing the
+   preregistration) and record the verdict.
+2. Conditional on the gate: D observer-policy study (MinMax /
+   percentile 0.1-99.9 / MSE-grid / pow2; W4A4 factorial + W8A4 +
+   W8A8; mechanism decomposition) on seeds 0/1/2.
 3. Reporting phase: per-checkpoint Pareto plots and the honest
    findings summary (ADR-010/011 wording).
-2. B3 (exhaustive search) remains deferred until a stable ranking
-   exists.
+4. Optional appendix: W3A3 stress test (still deferred).
 
 ## Known observations
 

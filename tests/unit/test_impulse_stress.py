@@ -66,6 +66,48 @@ class TestImpulseStress:
             apply_impulse_stress(clean, magnitude=-1.0)
 
 
+class TestGateV3StressConfiguration:
+    """The 7-sigma impulse intervention preregistered for Gate v3
+    (ADR-012 addendum 4), exercised at the exact frozen parameters."""
+
+    def _stressed_pair(self, n: int = 16):
+        from quantscope.analysis.stress_gate import GATE_V3_STRESS
+
+        clean = _clean(n=n, seed=11)
+        stressed = apply_impulse_stress(
+            clean,
+            fraction=GATE_V3_STRESS.fraction,
+            magnitude=GATE_V3_STRESS.magnitude,
+            seed=GATE_V3_STRESS.seed,
+        )
+        return clean, stressed
+
+    def test_impulse_amplitude_is_seven_sigma(self) -> None:
+        clean, stressed = self._stressed_pair()
+        changed = clean.tensors[0] != stressed.tensors[0]
+        for i in range(clean.tensors[0].shape[0]):
+            # numpy population std (ddof=0), matching the implementation.
+            std = float(clean.tensors[0][i].numpy().std())
+            vals = stressed.tensors[0][i][changed[i]]
+            assert vals.numel() >= 1
+            np.testing.assert_allclose(np.abs(vals.numpy()), 7.0 * std, rtol=1e-5)
+
+    def test_pairing_identity_at_v3_parameters(self) -> None:
+        clean, stressed = self._stressed_pair()
+        # Labels identical; non-impulse content exactly equal.
+        assert torch.equal(clean.tensors[1], stressed.tensors[1])
+        changed = clean.tensors[0] != stressed.tensors[0]
+        assert torch.equal(clean.tensors[0][~changed], stressed.tensors[0][~changed])
+        expected = max(1, round(0.002 * 16 * 16))
+        per_image = changed.reshape(changed.shape[0], -1).sum(dim=1)
+        assert torch.all(per_image <= expected)
+
+    def test_deterministic_at_frozen_stress_seed(self) -> None:
+        _, a = self._stressed_pair()
+        _, b = self._stressed_pair()
+        assert torch.equal(a.tensors[0], b.tensors[0])
+
+
 class TestObserverFactoryPlumbing:
     def _model(self) -> BottleneckResNet:
         torch.manual_seed(0)

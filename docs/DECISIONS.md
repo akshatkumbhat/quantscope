@@ -702,3 +702,67 @@ exceeded its behavioral threshold in three independent runs (seed 7 at
 Disposition: v2 recorded FAILED as written; no threshold adjusted after
 data. Per pre-registration the impulse mechanism is closed pending the
 user's decision on next steps.
+
+### ADR-012 addendum 4: Impulse Stress Gate v3 preregistration
+(2026-07-14, user decision; recorded and committed BEFORE the run)
+
+Standing of prior gates: **Gate v1 and Gate v2 remain FAILED as
+originally preregistered.** Neither result is reinterpreted, rescored,
+or amended. Gate v3 is a new, prospective mechanism variant — a fresh
+experiment, not a reanalysis.
+
+**Sole design change: impulse magnitude 6σ → 7σ.** Every other
+generator, model, calibration, quantization, and evaluation setting is
+unchanged (fraction 0.002, signs balanced, injected after blur, frozen
+0.12 recipe, simulation policy v1, W4A4 behavioral arm).
+
+**The 2.0× input-expansion threshold is retained**, along with all
+other v2 criteria verbatim (≥3 of the 4 structural early sites at
+≥1.25×; MinMax W4A4 clean-eval NLL degradation > 0.02; pairing
+integrity; MinMax-only inspection).
+
+**Rationale**: arithmetic consistency with the measured clean-input
+extrema, not optimization against observer performance. Gate v2
+measured clean calibration extremes of ~3.06σ, which caps the 6σ input
+MinMax ratio at 6/3.06 ≈ 1.96 — the v2 miss. At 7σ the same arithmetic
+predicts ≈ 7/3.06 ≈ 2.29 if the fresh split's extremes are similar;
+the actual extreme of the untouched seed-6 calibration split has never
+been observed, so the gate remains falsifiable (an extreme above 3.5σ
+fails it). No robust-observer result informed this choice.
+
+**Fresh evidence base — dev seed 6** (lowest reasonable unused seed):
+
+- Seeds already consumed: 0/1/2 (validation, generator streams 0–5
+  including probe streams +3), 7 (Gate v1 + generator screening,
+  streams 7–10), 8 (Gate v2, streams 8–11).
+- Seeds 3, 4, 5 rejected: each maps at least one of its train/eval/
+  calib streams onto validation-seed material (streams 0–5), which
+  would let stress design touch validation data.
+- Seed 6 uses streams 6 (train), 7 (eval), 8 (calib): no validation
+  stream is touched. Streams 7 and 8 previously served as dev-seed
+  train/eval material — the same freshness convention already accepted
+  when seed 8 followed seed 7 in v2. Critically, no seed-6 stream has
+  ever been used as a calibration split or had its MinMax ranges
+  inspected, so 7σ cannot have been tuned to this data.
+- Stress seed 1006 (1000 + dev seed, per v1/v2 convention).
+- A fresh FP32 checkpoint is trained under the frozen benchmark recipe
+  into `runs/gen-dev6/` before the gate; its accuracy is recorded.
+
+**Controls**: one Gate v3 attempt only (the runner refuses to execute
+if its artifact directory already exists); no fallback magnitude; no
+threshold adjustment after seeing results; percentile/MSE-grid/pow2
+results stay hidden until the gate passes; validation seeds 0/1/2
+remain untouched for the observer-policy comparison.
+
+**Mechanics**: gate criteria are now pure functions in
+`quantscope.analysis.stress_gate` (unit-tested, including the exact v2
+1.96× failure scenario and threshold boundaries); the frozen v3
+constants live there as `GATE_V3_STRESS` / `GATE_V3_SPEC`; the runner
+is `scripts/check_stress_gate_v3.py` and writes a provenance-labeled
+artifact to `runs/gen-dev6/texture-a-seed6-stress-gate-v3/`.
+
+Pass ⇒ proceed to the approved D observer-policy study on validation
+seeds 0/1/2 (ADR-012 design incl. the addendum-2 mechanism
+decomposition). Fail ⇒ the impulse stress family is closed permanently
+for this phase; stop and report (no automatic switch to glints, no
+amended thresholds, no custom-observer runs).
