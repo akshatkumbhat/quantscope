@@ -88,9 +88,7 @@ def _render_pattern(
         f = freq * (1.0 + rng.uniform(-params.freq_jitter, params.freq_jitter))
         angle = theta + rotation
         phase = rng.uniform(0.0, 2.0 * np.pi)  # random phase == translation
-        out += amp * np.sin(
-            2.0 * np.pi * f * (xx * np.cos(angle) + yy * np.sin(angle)) + phase
-        )
+        out += amp * np.sin(2.0 * np.pi * f * (xx * np.cos(angle) + yy * np.sin(angle)) + phase)
     return out
 
 
@@ -103,9 +101,7 @@ def make_texture10(
     """Generate a Texture-10 dataset (images float32, labels int64)."""
     p = params or Texture10Params()
     if num_samples < p.num_classes:
-        raise ValueError(
-            f"num_samples ({num_samples}) must be >= num_classes ({p.num_classes})"
-        )
+        raise ValueError(f"num_samples ({num_samples}) must be >= num_classes ({p.num_classes})")
     rng = np.random.default_rng(seed)
     size = p.image_size
     coords = np.linspace(0.0, 1.0, size, endpoint=False)
@@ -148,9 +144,7 @@ def make_texture10(
             img = gaussian_filter(img, sigma=sigma)
         images[i, 0] = img.astype(np.float32)
 
-    return TensorDataset(
-        torch.from_numpy(images), torch.from_numpy(labels.astype(np.int64))
-    )
+    return TensorDataset(torch.from_numpy(images), torch.from_numpy(labels.astype(np.int64)))
 
 
 def apply_impulse_stress(

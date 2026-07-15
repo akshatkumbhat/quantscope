@@ -31,9 +31,7 @@ def make_synthetic_dataset(
     orientation; Gaussian noise keeps the task non-trivial.
     """
     if num_samples < num_classes:
-        raise ValueError(
-            f"num_samples ({num_samples}) must be >= num_classes ({num_classes})"
-        )
+        raise ValueError(f"num_samples ({num_samples}) must be >= num_classes ({num_classes})")
     rng = np.random.default_rng(seed)
     ys = np.arange(num_samples) % num_classes
     rng.shuffle(ys)
@@ -48,9 +46,7 @@ def make_synthetic_dataset(
         noise = rng.normal(scale=noise_scale, size=(in_channels, image_size, image_size))
         images[i] = pattern[None, :, :] + noise
 
-    return TensorDataset(
-        torch.from_numpy(images), torch.from_numpy(ys.astype(np.int64))
-    )
+    return TensorDataset(torch.from_numpy(images), torch.from_numpy(ys.astype(np.int64)))
 
 
 def build_datasets(
