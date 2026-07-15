@@ -185,13 +185,34 @@ addenda 2–4); B2's checkpoint-conditioned-sensitivity conclusion stands.
 - Out of scope per approved package (untouched): README, CI, W3A3,
   Q4, pushing.
 
+## Close-out status (2026-07-15)
+
+- [x] README rewritten to match actual behavior: implemented features,
+  quickstart/CLI verified, provenance rules, and an explicit
+  honest-gaps section (QAT not built; hardware cost model is a stub —
+  sweep cost is the estimated normalized weight-bits proxy and the
+  fictional YAML profile is unconsumed; no numerical-regression
+  harness).
+- [x] CI green on Python 3.11 and 3.12 (run 29382201255). Five root
+  causes fixed in sequence: floating ruff version (pinned 0.15.x);
+  environment-dependent first-party import classification (explicit
+  known-first-party); **src/quantscope/data was never committed** — an
+  unanchored `data/` gitignore rule silently excluded the dataset
+  generators, so every clone/CI was broken while local work passed
+  (artifact-dir ignores now anchored to the repo root); first-ever
+  lint/format of that package; and unpinned torch resolving 2.13,
+  tripping the ADR-011 version guard in the graph-anchored parity
+  simulator (CI now installs the validated torch 2.2.2 / torchvision
+  0.17.2 CPU environment; the guard stays in place). Deprecated
+  checkout/setup-python actions bumped.
+
 ## Next actions
 
-1. Repo close-out toward definition-of-done (README alignment, CI) —
-   pending separate approval.
-2. Optional appendix list (deferred, run only if separately
+1. Optional appendix list (deferred, run only if separately
    approved): W3A3 stress test; Q4 sim_custom ↔ backend-matched
-   W8A8 comparison (rationale in ADR-012 addendum 6).
+   W8A8 comparison (rationale in ADR-012 addendum 6); re-validating
+   the parity simulator on newer torch (would lift the ADR-011 guard
+   deliberately, not incidentally).
 
 ## Known observations
 
