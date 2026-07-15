@@ -214,16 +214,30 @@ addenda 2–4); B2's checkpoint-conditioned-sensitivity conclusion stands.
   declared weight-scale rule, frozen activation qparams); recipe
   selection on fresh dev seed 9 from three predeclared LRs in a fixed
   order; frozen success criteria; artifact schema; scope exclusions.
-- [ ] Awaiting user review of the draft. Implementation starts only
-  after approval; validation seeds only after the dev recipe freezes.
+- [x] ADR-013 approved with amendments (fixed quantization
+  specification; baseline tolerance gate; epoch-10 freeze; full-run
+  fake-quant schedule).
+- [x] Torch-native STE adapter (`quantization/qat.py`) with bit-exact
+  NumPy parity, clipped STE, frozen activation qparams, per-forward
+  detached weight scales; 17 unit tests; finetune loop raises on any
+  non-finite loss/gradient.
+- [x] Dev seed 9: R1 (lr 3e-4, 10 epochs) passed first
+  (ΔNLL −0.0610, +2.20 pp) and was frozen; R2/R3 never run.
+- [x] Validation (seeds 0/1/2): baseline consistency gates passed;
+  **ADR-013 PASSED all five criteria** (addendum 2). Mean ΔNLL
+  −0.0437 vs PTQ (3/3 improved), mean accuracy recovery +1.60 pp,
+  mean NLL-gap recovery 0.762; effect size tracks PTQ-gap size
+  (seed 2 smallest: +0.55 pp, 0.518). All W4A4 numbers simulated;
+  ~151 s CPU fine-tune per checkpoint (measured). Artifacts:
+  `runs/validation-012/texture-a-seed{0,1,2}-qat-w4a4/`,
+  `runs/validation-012/qat-study-summary.json` (not committed).
+
+**QAT (ADR-013) is complete.**
 
 ## Next actions
 
-1. ADR-013 implementation after draft review (Torch fake-quant
-   adapter + tests → dev-seed-9 checkpoint → recipe selection →
-   frozen validation runs).
-2. Then: hardware cost model; numerical-regression harness
-   (definition-of-done gaps).
+1. Hardware cost model; numerical-regression harness
+   (definition-of-done gaps) — pending separate approval.
 3. Optional appendix list (deferred, run only if separately
    approved): W3A3 stress test; Q4 sim_custom ↔ backend-matched
    W8A8 comparison (rationale in ADR-012 addendum 6); re-validating

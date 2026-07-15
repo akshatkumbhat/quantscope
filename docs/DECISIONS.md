@@ -1156,3 +1156,50 @@ preregistered development recipe sequence; (6) validation on seeds
 0/1/2 only if a development recipe passes. The hardware cost model,
 regression harness, W3A3, Q4, and newer-Torch validation stay out of
 scope for ADR-013.
+
+### ADR-013 addendum 2: results — PASSED on all five criteria
+(2026-07-15)
+
+Development phase (seed 9): R1 (lr 3e-4) passed on the first attempt
+(ΔNLL −0.0610 vs PTQ, +2.20 pp, gap recovery 0.815) and was frozen
+per the first-pass rule; R2/R3 were never run. Artifact:
+`runs/gen-dev9/texture-a-seed9-qat-dev-lr0.0003_ep10/`.
+
+Validation: baseline consistency gates PASSED on all three seeds
+(accuracy and prediction counts exact, NLL within 1e-6, per-site
+activation scales exactly equal to the canonical D artifact values;
+both canonical and recomputed values stored). The frozen recipe
+(lr 3e-4, 10 epochs, epoch-10 checkpoint, fake-quant first step
+through last) then ran exactly once per checkpoint:
+
+| seed | FP32 NLL / acc (measured) | PTQ W4A4 NLL / acc | QAT W4A4 NLL / acc | ΔNLL | acc rec | gap recovery |
+| --- | --- | --- | --- | --- | --- | --- |
+| 0 | 0.1075 / 95.70% | 0.1853 / 92.55% | 0.1122 / 95.25% | −0.0731 | +2.70 pp | 0.940 |
+| 1 | 0.1233 / 95.40% | 0.1782 / 93.45% | 0.1328 / 95.00% | −0.0454 | +1.55 pp | 0.828 |
+| 2 | 0.1284 / 95.00% | 0.1525 / 94.00% | 0.1400 / 94.55% | −0.0125 | +0.55 pp | 0.518 |
+
+All W4A4 values simulated (fake-quant policy v1, not integer
+execution); FP32 measured.
+
+Criteria: (1) NLL improved on 3/3 (needed ≥2/3); (2) mean NLL
+improvement 0.0437 (needed ≥0.01); (3) mean accuracy recovery
+1.60 pp (needed ≥1.0 pp or ≥⅓ of the 2.03 pp mean PTQ gap — both
+met); (4) no non-finite parameter/gradient/loss/metric (enforced by
+per-step raises during training); (5) no checkpoint worse than PTQ
+(all three improved). **ADR-013 PASSES.**
+
+Checkpoint-level honesty: the effect size tracks the size of the PTQ
+gap — seed 2, with the smallest PTQ damage (1.00 pp), recovered least
+(+0.55 pp, gap recovery 0.518). Mean gap recovery 0.762; no
+checkpoint reached FP32 quality, which ADR-013 did not require.
+Secondary evidence: QAT roughly halves prediction flips vs FP32
+relative to PTQ's flips and raises logit SQNR vs FP32 on every seed
+(13.5→19.2 / 15.8→20.2 / 18.9→20.8 dB, simulated). Fine-tuning
+wall-clock ≈151 s per checkpoint, measured on the development CPU —
+no accelerator claim.
+
+Supported claim (exactly as preregistered): *training with fake
+quantization can adapt a checkpoint to the frozen W4A4 quantizer* —
+simulated throughout; no real INT4 execution or latency claim.
+Artifacts: `runs/validation-012/texture-a-seed{0,1,2}-qat-w4a4/`,
+`runs/validation-012/qat-study-summary.json`.
