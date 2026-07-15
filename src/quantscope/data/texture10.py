@@ -113,7 +113,7 @@ def make_texture10(
 
     labels = np.arange(num_samples) % p.num_classes
     rng.shuffle(labels)
-    n_boundary = int(round(num_samples * p.boundary_fraction))
+    n_boundary = round(num_samples * p.boundary_fraction)
     boundary_mask = np.zeros(num_samples, dtype=bool)
     boundary_mask[rng.choice(num_samples, size=n_boundary, replace=False)] = True
 
@@ -167,10 +167,10 @@ def apply_impulse_stress(
     parameter are preserved by construction — the returned dataset is a
     paired copy of the input.
 
-    Per image: ``fraction`` of pixels are replaced by ``±magnitude`` ×
-    that image's standard deviation, signs balanced deterministically
-    (alternating +/− over the selected pixels). Label-independent by
-    construction.
+    Per image: ``fraction`` of pixels are replaced by ``+/-magnitude``
+    times that image's standard deviation, signs balanced
+    deterministically (alternating +/- over the selected pixels).
+    Label-independent by construction.
     """
     if not 0.0 < fraction <= 0.05:
         raise ValueError("fraction must be in (0, 0.05]")
@@ -180,7 +180,7 @@ def apply_impulse_stress(
     stressed = images.clone().numpy()
     rng = np.random.default_rng(seed)
     num_pixels = stressed.shape[-2] * stressed.shape[-1]
-    num_impulses = max(1, int(round(fraction * num_pixels)))
+    num_impulses = max(1, round(fraction * num_pixels))
     for i in range(stressed.shape[0]):
         std = float(stressed[i].std())
         flat = stressed[i].reshape(-1)
