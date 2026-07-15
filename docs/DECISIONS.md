@@ -1108,3 +1108,51 @@ stay as recorded.
 DRAFT — awaiting user review. Implementation (Torch adapter, tests,
 training loop, dev-seed-9 checkpoint) begins only after approval;
 validation seeds are touched only after the dev recipe freezes.
+
+### ADR-013 addendum: approved with amendments (2026-07-15) —
+preregistration final; implementation authorized
+
+The draft is approved. Decisions 1 (dev seed 9), 3 (clipped STE,
+applied and tested identically for weights and activations), and 4
+(three LRs, first-pass selection, everything else frozen) stand as
+written. Two amendments and two freezes:
+
+1. **Terminology**: this phase is **fixed-quantization-specification
+   QAT**, not fully fixed-qparam QAT. Only activation qparams are
+   numerically frozen; the weight scheme/range/rule is frozen while
+   per-channel weight scales are recomputed from current weights
+   (detached from autograd). After fine-tuning, final weight qparams
+   are recomputed once for the exported/evaluated QAT checkpoint and
+   stored in the artifact.
+2. **Baseline consistency (amended decision 5)**: the D artifact is
+   the canonical PTQ baseline; the QAT run independently recomputes
+   it as a consistency gate with predeclared tolerances — accuracy
+   and prediction counts exactly equal; NLL within absolute 1e-6;
+   other aggregate float metrics within the existing
+   deterministic-test tolerances; checkpoint identity, calibration
+   sample IDs, qparam-policy identifier, observer configuration,
+   quantization ranges, and evaluation sample IDs exactly equal.
+   Exceeding any tolerance STOPS the study before QAT training as a
+   provenance/reproducibility failure; canonical D values are never
+   overwritten. Both canonical and recomputed values are stored in
+   the QAT artifact.
+3. **Checkpoint-selection freeze**: the epoch-10 checkpoint is used
+   for development screening and every validation run. No
+   retrospective best-epoch selection, no early stopping, no
+   metric-based restore. Per-epoch metrics are diagnostic only. The
+   selected learning rate + fixed 10 epochs is the frozen validation
+   recipe.
+4. **Fake-quant scheduling freeze**: weight and activation fake
+   quantization are enabled from the first fine-tuning step through
+   the last. No FP32 warm-up, no delayed activation quantization, no
+   observer updates, no staged bit widths, no batch-dependent
+   recalibration — those are separate QAT variants and would weaken
+   the direct PTQ-vs-QAT comparison.
+
+Authorized implementation order: (1) Torch-native affine fake-quant +
+STE tests; (2) NumPy/Torch forward-parity tests; (3) tiny
+deterministic QAT fixture; (4) seed-9 FP32 checkpoint; (5) the
+preregistered development recipe sequence; (6) validation on seeds
+0/1/2 only if a development recipe passes. The hardware cost model,
+regression harness, W3A3, Q4, and newer-Torch validation stay out of
+scope for ADR-013.
