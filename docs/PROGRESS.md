@@ -206,9 +206,25 @@ addenda 2–4); B2's checkpoint-conditioned-sensitivity conclusion stands.
   0.17.2 CPU environment; the guard stays in place). Deprecated
   checkout/setup-python actions bumped.
 
+## QAT status (2026-07-15)
+
+- [x] ADR-013 DRAFT preregistration committed before any training
+  code: fixed-qparam W4A4 QAT vs the identical PTQ baseline on
+  validation seeds 0/1/2; Torch-native STE adapter (clipped STE,
+  declared weight-scale rule, frozen activation qparams); recipe
+  selection on fresh dev seed 9 from three predeclared LRs in a fixed
+  order; frozen success criteria; artifact schema; scope exclusions.
+- [ ] Awaiting user review of the draft. Implementation starts only
+  after approval; validation seeds only after the dev recipe freezes.
+
 ## Next actions
 
-1. Optional appendix list (deferred, run only if separately
+1. ADR-013 implementation after draft review (Torch fake-quant
+   adapter + tests → dev-seed-9 checkpoint → recipe selection →
+   frozen validation runs).
+2. Then: hardware cost model; numerical-regression harness
+   (definition-of-done gaps).
+3. Optional appendix list (deferred, run only if separately
    approved): W3A3 stress test; Q4 sim_custom ↔ backend-matched
    W8A8 comparison (rationale in ADR-012 addendum 6); re-validating
    the parity simulator on newer torch (would lift the ADR-011 guard

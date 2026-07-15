@@ -921,3 +921,190 @@ running it now would add little to the primary conclusions.
 
 **Plan step D is complete.** Next work package: the reporting phase,
 to be separately scoped and approved before work begins.
+
+## ADR-013: Simulated W4A4 quantization-aware fine-tuning (DRAFT
+preregistration, 2026-07-15 — committed before any training code;
+implementation starts only after user review of this draft)
+
+### Objective and claim boundary
+
+Evaluate whether simulated W4A4 quantization-aware fine-tuning (QAT)
+recovers task quality lost by simulated W4A4 PTQ. The primary claim
+is strictly numerical: *training with fake quantization can adapt a
+checkpoint to the frozen W4A4 quantizer.* No claim of real INT4
+execution, INT4 kernels, or latency improvement is made or implied;
+every W4A4 number in this ADR's experiments is **simulated**
+(fake-quant simulation policy v1). Wall-clock fine-tuning time is
+reported as **measured on the development CPU**, with no accelerator
+extrapolation.
+
+### Experimental design
+
+Checkpoints: the three frozen freq_step=0.12 FP32 validation
+checkpoints (seeds 0/1/2, `runs/validation-012/`). Per checkpoint,
+three arms:
+
+1. FP32 baseline (measured; existing artifacts).
+2. Simulated W4A4 PTQ baseline: `simulate_quantized` with MinMax
+   calibration on the checkpoint's clean calibration split — the
+   identical procedure, placements, and qparams as the D study's
+   `minmax|W4A4|clean->clean` cell. The QAT run artifact recomputes
+   this baseline and must match the D artifact's recorded values
+   (consistency check, not a re-derivation).
+3. Simulated W4A4 QAT: fine-tuning initialized from the same FP32
+   checkpoint, evaluated under the same frozen quantizer (below).
+
+Held identical across arms 2 and 3: quantization placements (policy
+v1: input + all ReLU sites, all Conv2d/Linear weights), per-channel
+symmetric weights, per-tensor affine activations, the calibration
+split and sample order (`texture10_calibration`, seed stream +2,
+deterministic), the evaluation split (seed stream +1), preprocessing,
+and architecture. QAT is never compared against a PTQ baseline with
+different qparams or graph placement.
+
+### Fixed-qparam QAT (this phase's scope)
+
+1. Derive W4A4 qparams with the frozen PTQ calibration procedure
+   (MinMax on the clean calibration split, observed against the
+   weight-quantized model, exactly as `simulate_quantized`).
+2. Insert fake quantization with those qparams and fine-tune the
+   weights through a straight-through estimator.
+3. **Activation qparams are frozen** for the entire fine-tune and for
+   final evaluation; observer ranges are never updated during
+   validation training.
+4. **Weight fake-quant scale policy (disambiguation, declared now):**
+   weight qparams are re-derived per forward pass from the *current*
+   weights under the same per-channel symmetric min-max rule, with no
+   gradient through the scale computation (scales detached). Frozen
+   per-channel weight scales would go stale as weights move; the
+   deployment weight quantizer is derived from the final weights at
+   export, exactly as PTQ derives it from its input weights. The
+   *fixed* quantizer being adapted to is therefore: frozen activation
+   qparams + the frozen weight quantization *rule*.
+5. Final QAT evaluation: the fine-tuned weights are quantized by the
+   same rule and the frozen activation qparams are re-attached — the
+   same simulation pipeline that evaluates PTQ.
+
+Observer-updating QAT is future work and MUST NOT be added during
+ADR-013 unless separately justified in writing before any validation
+result is inspected.
+
+### Implementation boundary
+
+- The NumPy affine core (`quantization/affine.py`) remains the
+  backend-independent reference implementation, untouched.
+- A new Torch-native differentiable adapter (planned:
+  `quantization/qat.py`) implements training-path fake quantization
+  with Torch tensor ops only — **no NumPy in the differentiable
+  forward path** — consuming QuantScope-generated qparams and
+  applying the same clipping/quantization ranges as the simulator.
+- Forward parity: the Torch adapter must match the NumPy core's
+  quantize/dequantize on deterministic tensors (away from the
+  explicitly documented Torch-compatibility differences of ADR-011),
+  verified by unit tests before any fine-tuning run.
+- **STE gradient policy (declared now): clipped STE.** For
+  d(fake_quant(x))/dx: pass-through (1) where the pre-clamp integer
+  code lies within [qmin, qmax]; zero where the value saturates.
+  Finite gradients through all non-saturated values; both behaviors
+  unit-tested at the saturation boundaries.
+
+### Recipe selection (development seed, before validation)
+
+- **Development checkpoint: fresh dev seed 9** — the lowest unused
+  experiment seed. Validation seeds 0/1/2 (generator streams 0–5) are
+  not used for recipe selection in any way. Seed 9's streams (train
+  9, eval 10, calib 11) overlap previously generated dev-seed streams
+  (9 = seed 7's calib / seed 6's probe; 10 = seed 7's probe / seed
+  8's calib; 11 = seed 8's probe), the same freshness convention
+  accepted for gates v2/v3; no validation stream is touched. A new
+  FP32 checkpoint is trained under the frozen benchmark recipe into
+  `runs/gen-dev9/` before recipe work begins. Reusing dev seed 6 was
+  rejected: its checkpoint served Gate v3's stress design, and one
+  dev seed per decision is the established pattern.
+- **Exactly three predeclared recipes**, varying learning rate only.
+  Fixed across recipes: AdamW (the project optimizer), weight decay
+  1e-4, batch size 64, cosine schedule, **10 fine-tuning epochs**
+  (within the 8–15 bound), the frozen qparam policy above, and
+  fake-quant active from the first step (no delayed/gradual
+  schedule).
+  - R1: lr 3e-4
+  - R2: lr 1e-4
+  - R3: lr 1e-3
+- **Predeclared evaluation order R1 → R2 → R3** (mid magnitude first;
+  conservative fallback; aggressive last). Stop at the FIRST recipe
+  that, on dev seed 9, improves both W4A4 NLL and W4A4 accuracy over
+  that checkpoint's PTQ baseline with no numerical instability (no
+  NaN/inf parameter, gradient, loss, or metric). That recipe is
+  frozen and run exactly once per validation checkpoint. If none of
+  the three passes on the development seed, ADR-013 stops there and
+  the negative development result is recorded; no new recipes without
+  a written amendment.
+
+### Predeclared metrics
+
+Primary (per checkpoint and mean over seeds 0/1/2):
+
+- ΔNLL: QAT W4A4 vs PTQ W4A4 (simulated).
+- Accuracy recovery in percentage points: QAT acc − PTQ acc.
+- NLL gap recovery = (PTQ_NLL − QAT_NLL) / (PTQ_NLL − FP32_NLL),
+  reported unclipped (values > 1 or < 0 reported as computed).
+
+Secondary: prediction flips vs PTQ and vs FP32; mean correct-class
+margin; output SQNR (dB) and cosine similarity vs FP32 logits; weight
+and activation saturation diagnostics; per-epoch training loss and
+gradient-finiteness checks; elapsed wall-clock fine-tuning time
+(measured, development CPU only).
+
+### Success criteria (frozen before any run)
+
+ADR-013 PASSES iff the frozen validation recipe:
+
+1. improves W4A4 NLL over PTQ on ≥ 2 of 3 validation checkpoints;
+2. improves mean W4A4 NLL by ≥ 0.01;
+3. recovers ≥ 1.0 mean accuracy pp, OR ≥ one-third of the mean
+   PTQ-to-FP32 accuracy gap;
+4. introduces no NaN or infinite parameter, gradient, loss, or
+   metric anywhere in training or evaluation;
+5. makes no checkpoint worse than its PTQ baseline by more than
+   0.5 accuracy pp.
+
+All checkpoint-level results are reported even if the mean passes.
+QAT completion does NOT require reaching FP32 quality. A negative
+result is valid and publishable: if the implementation passes parity
+and gradient tests but the frozen recipe does not recover PTQ damage,
+that is the finding.
+
+### Tests (before any validation run)
+
+Torch/NumPy forward parity on deterministic tensors; STE pass-through
+and saturation-zero gradient behavior; clipping/saturation
+boundaries; frozen-qparam behavior (activation qparams provably
+unchanged across a training step); deterministic fine-tuning on a
+tiny fixture (two runs, identical outcome); artifact provenance
+labels; actionable failure on incompatible or missing qparams. QAT
+training itself is marked slow and stays out of the fast core suite.
+
+### Artifact schema (per QAT run)
+
+`config.json` / `environment.json` (incl. Torch and NumPy versions)
+via RunWriter, plus labeled metrics containing: source FP32
+checkpoint path and SHA-256; calibration split identity (generator
+seed stream and sample count; deterministic order noted); frozen
+activation qparams (values + SHA-256 of their serialization) and the
+weight-scale rule; the full training recipe; per-epoch loss/metric
+series; final FP32/PTQ/QAT comparison with the predeclared metrics;
+measured/simulated labels on every entry; elapsed CPU seconds
+(measured).
+
+### Scope exclusions
+
+No real-INT4 execution claims or kernels; no Q4; no W3A3; the Torch
+2.2.2 parity guard stays; no hardware cost model work; no Texture-10
+generator changes; no observer-policy retuning; B/C/D conclusions
+stay as recorded.
+
+### Status
+
+DRAFT — awaiting user review. Implementation (Torch adapter, tests,
+training loop, dev-seed-9 checkpoint) begins only after approval;
+validation seeds are touched only after the dev recipe freezes.
