@@ -1,0 +1,87 @@
+{
+  "provenance_legend": {
+    "simulated": "fake-quant simulation policy v1; not integer execution",
+    "estimated": "analytical hardware cost model; not a measurement",
+    "measured": "actually executed/observed (FP32 eval; real INT8 in step C)"
+  },
+  "figures": [
+    {
+      "figure": "pareto_frontiers",
+      "provenance": {
+        "nll": "simulated",
+        "cost": "estimated"
+      },
+      "notes": "one panel per checkpoint; frontiers never averaged; Jaccard overlap on figure",
+      "sources": [
+        {
+          "path": "runs/validation-012/texture-a-seed0-sweep/sweep_table.json",
+          "sha256": "1645fb83cbab2333987c726701b9074163a1730b5698b3efbac7ae9aef0f80e9"
+        },
+        {
+          "path": "runs/validation-012/texture-a-seed1-sweep/sweep_table.json",
+          "sha256": "c1bb732a99255391b0608a66de5e826eeb2ec671773c52f2a503dad5a8ff50a1"
+        },
+        {
+          "path": "runs/validation-012/texture-a-seed2-sweep/sweep_table.json",
+          "sha256": "81510ad86bfc4917f16fdb38f2954d2041844875cc40b5a9f60f3ea3867d09a2"
+        }
+      ],
+      "output": "pareto_frontiers.png",
+      "output_sha256": "f4b7bf6248be3ae42e179fe776769e7b3e881814e79b2236fc6b9cd248a7db44"
+    },
+    {
+      "figure": "observer_factorial_w4a4",
+      "provenance": {
+        "quantized_nll": "simulated",
+        "fp32_reference": "measured"
+      },
+      "notes": "per-checkpoint W4A4 NLL by observer and calibration condition",
+      "sources": [
+        {
+          "path": "runs/validation-012/texture-a-seed0-observer-study/metrics.json",
+          "sha256": "1eb14362ae090a79132e22637d9adc23b62d0cc2d87a44be90544c56866250e4"
+        },
+        {
+          "path": "runs/validation-012/texture-a-seed1-observer-study/metrics.json",
+          "sha256": "723fbf5cb0dfc6fbff05120d1b743c117fa16fc769434eb89991d100da06dafa"
+        },
+        {
+          "path": "runs/validation-012/texture-a-seed2-observer-study/metrics.json",
+          "sha256": "47170abce8e115c0f4318b62ff970ffbf567d603c4529b8a07a057f2ac87361c"
+        }
+      ],
+      "output": "observer_factorial_w4a4.png",
+      "output_sha256": "4e15ff2e020203327a89a3d38e38752dbc72ad841adffe24a8cc96db9f1a87c2"
+    },
+    {
+      "figure": "mechanism_decomposition",
+      "provenance": {
+        "delta_nll": "simulated"
+      },
+      "notes": "cumulative stage substitution, per checkpoint; input site dominates",
+      "sources": [
+        {
+          "path": "runs/validation-012/observer-study-summary.json",
+          "sha256": "c4ea941115e09faa3ef961b51ec2bdce001d31451c01501898a4f75350afbd60"
+        }
+      ],
+      "output": "mechanism_decomposition.png",
+      "output_sha256": "c093255901c239834b69d6bc451f30ca71f0bd428ae3d8174197bba584097ea1"
+    },
+    {
+      "figure": "pow2_cost",
+      "provenance": {
+        "nll_cost": "simulated"
+      },
+      "notes": "per-checkpoint values; panels intentionally use different y-scales",
+      "sources": [
+        {
+          "path": "runs/validation-012/observer-study-summary.json",
+          "sha256": "c4ea941115e09faa3ef961b51ec2bdce001d31451c01501898a4f75350afbd60"
+        }
+      ],
+      "output": "pow2_cost.png",
+      "output_sha256": "33e56c5b3c4206b4bc5b678e35caf7c9e4931ababc69243c7a929455906f892d"
+    }
+  ]
+}

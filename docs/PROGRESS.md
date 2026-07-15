@@ -160,14 +160,38 @@ addenda 2–4); B2's checkpoint-conditioned-sensitivity conclusion stands.
 
 **Plan step D is complete.**
 
+## Reporting phase status (2026-07-14)
+
+- [x] Report figures generated deterministically from artifacts via
+  `quantscope.reporting` + `scripts/build_report.py`: per-checkpoint
+  B3 Pareto frontiers (never averaged; Jaccard overlap on-figure),
+  D W4A4 factorial (per-checkpoint values), mechanism decomposition,
+  Q3 pow2 cost. Field-level provenance labels on every figure and in
+  `docs/report/figures/manifest.json` (source paths + SHA-256).
+  Figures are small (~67–130 KB) and committed under
+  `docs/report/figures/`; byte-identical on regeneration.
+- [x] `docs/REPORT.md`: honest findings summary — B3 negative finding
+  (scoped: one-at-a-time ablation rankings failed to guide joint
+  assignment on this benchmark, not a general claim), C parity pass
+  scoped to Torch-2.2-compatible arithmetic on this graph/config with
+  the two named compatibility findings, D narrow positive
+  (input/early-activation calibration robustness; pow2 result scoped
+  to the frozen round-up policy under contaminated calibration), full
+  gate v1→v2→v3 history with failures at equal prominence, both
+  evidence caveats, reproduction instructions.
+- [x] Tests: artifact loading fail-loud cases, manifest provenance
+  labels, byte-deterministic outputs (synthetic fixtures, no runs/
+  dependency).
+- Out of scope per approved package (untouched): README, CI, W3A3,
+  Q4, pushing.
+
 ## Next actions
 
-1. Reporting phase: per-checkpoint Pareto plots and the honest
-   findings summary (ADR-010/011/012 wording). Scope to be
-   preregistered/approved separately before work begins.
+1. Repo close-out toward definition-of-done (README alignment, CI) —
+   pending separate approval.
 2. Optional appendix list (deferred, run only if separately
    approved): W3A3 stress test; Q4 sim_custom ↔ backend-matched
-   W8A8 comparison.
+   W8A8 comparison (rationale in ADR-012 addendum 6).
 
 ## Known observations
 
