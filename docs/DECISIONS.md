@@ -1406,3 +1406,90 @@ generator conclusions unchanged.
 
 DRAFT — awaiting user review. The hardware module is not implemented
 until this preregistration is approved.
+
+### ADR-014 addendum: approved with amendments (2026-07-15) —
+preregistration final; implementation authorized
+
+The draft is approved; the fictional coefficients stand as
+assumptions, not calibrated hardware facts. Amendments:
+
+1. **Profile migration**: `configs/hardware/generic_edge_npu.yaml` is
+   rewritten to schema v1 (single canonical profile, no ambiguous
+   authority). The old throughput/bandwidth-format contents are
+   preserved verbatim as
+   `tests/fixtures/hardware/generic_edge_npu_legacy_v0.yaml`, and a
+   test proves the legacy format fails validation with a clear
+   missing/unsupported-schema error.
+2. **Schema controls**: Pydantic with unknown fields forbidden;
+   explicit `schema_version`, `profile_name`, `fictional: true`,
+   description/assumptions, coefficient-unit definitions, supported
+   precision pairs, accumulator precision, and a traffic-model
+   identifier. Precision coefficients are a LIST of entries (not a
+   YAML mapping, where duplicate keys are silently overwritten);
+   (weight_bits, activation_bits) uniqueness is validated.
+3. **Numerical behavior**: all cost math in float64; no rounding
+   before totals, normalization, Pareto construction, feasibility, or
+   tie-breaking (rounding is display-only); serialized precision
+   sufficient to reproduce ordering; both the raw source-file SHA-256
+   and a canonical parsed-profile digest are recorded.
+4. **Canonical group ordering**: an explicit versioned constant
+   (`GROUP_ORDER_V1`, matching the frozen B3 partition) replaces
+   incidental dict order; it is stored in every accounting and
+   recommendation artifact; configuration identifiers are readable
+   (`stem=w4a4|block_a_conv1=w8a8|...`) and used for the final
+   lexicographic tie-break; a B3 artifact whose group set does not
+   exactly match fails loudly.
+5. **Activation accounting clarified** (base assumption approved):
+   no cache; one read and one write per distinct modeled activation
+   tensor; no per-consumer multiplication; shared residual tensors
+   counted once; the model input is owned by the stem group (one
+   read); host transfer and input-quantization overhead excluded.
+   Reconciliation tests use tensor/graph-node identities, not only
+   aggregate element counts.
+6. **Classifier and exclusions**: classifier weights and MACs are
+   modeled at the group's assigned precision and its input traffic is
+   modeled (at the producing expand group); only the unquantized
+   output logits are excluded from activation-memory cost. Excluded
+   operations (BatchNorm, residual adds, pooling, flatten, logits,
+   quantize/dequantize boundaries) are recorded explicitly with
+   counts. Normalized cost is described as the **normalized estimated
+   cost of the modeled quantizable workload** — never whole-model
+   energy/latency/total hardware cost. Every artifact carries modeled
+   weighted-module count, modeled MAC/parameter totals, excluded op
+   types and counts, traffic assumptions, and a warning that omitted
+   constant costs can overstate the fraction of system-level savings.
+7. **Normalization/budget semantics**: normalized_cost =
+   configuration_total / all_int8_total (same profile + accounting);
+   all-INT8 asserted 1.0 within tolerance; budgets apply to this
+   normalized modeled-workload cost. Infeasible budgets emit a
+   structured result (feasible: false; cheapest normalized cost;
+   cheapest configuration identifier; no recommendation); budgets are
+   never relaxed.
+8. **Additional invariants**: components finite and nonnegative;
+   zero-MAC/zero-parameter groups behave; changing one group's
+   precision changes only that group's precision-dependent
+   contributions; group totals sum to configuration totals within
+   tolerance; profile/accounting hashes stable across runs; different
+   coefficients change digest and costs; unsupported W/A combinations
+   fail before any partial artifact is written; monotonicity tested
+   at both group-component and whole-configuration level.
+9. **Artifact lineage**: the enrichment script never modifies B3
+   files; each artifact records source B3 path + SHA-256, checkpoint
+   identity, profile path/source hash/canonical digest, accounting
+   digest, group-order version, cost-model schema version, all
+   component costs, raw + normalized totals, and provenance (quality
+   simulated; costs estimated; recommendations derived from simulated
+   quality and estimated cost). Data files are written to a temporary
+   file and atomically renamed only after complete validation.
+10. **Proxy interpretation**: the weight-bits proxy remains a
+    historical baseline; B3 artifacts are never rewritten or
+    retrospectively presented as hardware-profile costs. Agreement
+    and low correlation are both valid outcomes (the new model adds
+    compute and activation terms the proxy omitted).
+
+Authorized order: profile schema/loader → legacy rejection test →
+deterministic accounting → component-wise cost → CLI validation and
+scoring → B3 enrichment/recommendation script → invariant/
+integration/provenance/determinism tests → results addendum →
+README/report alignment. The numerical-regression harness waits until
+ADR-014 closes.
