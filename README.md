@@ -56,6 +56,22 @@ Narrow conclusion: percentile/MSE-grid observers protect
 input/early-activation calibration at 4-bit activations; not a
 network-wide superiority claim.
 
+**Quantization-aware training (simulated W4A4)**
+(`quantscope.quantization.qat`) — fixed-quantization-specification QAT
+using fake-quant policy v1 and a Torch-native clipped straight-through
+estimator with bit-exact forward parity against the NumPy reference.
+Activation qparams are frozen from PTQ calibration; per-channel weight
+qparams are recomputed from the current weights under a frozen
+quantization specification. Preregistered three-checkpoint result
+(ADR-013, all *simulated*): mean NLL improvement vs PTQ **0.0437**,
+mean accuracy recovery **1.60 pp**, improvement on all three
+checkpoints; no checkpoint reached FP32 quality. Fine-tuning took
+~151 s per checkpoint, measured CPU wall-clock on the project machine
+— no real INT4 execution, deployment speedup, or accelerator
+performance is implied. Details: ADR-013 in
+[docs/DECISIONS.md](docs/DECISIONS.md); artifacts under
+`runs/validation-012/texture-a-seed{0,1,2}-qat-w4a4/`.
+
 **Reproducible artifacts & reporting** (`quantscope.utilities`,
 `quantscope.reporting`) — every run writes config, environment, and
 metrics with mandatory measured/simulated/estimated provenance labels;
@@ -64,7 +80,6 @@ byte-deterministically from artifacts with a hash manifest.
 
 ## Not implemented (honest gaps)
 
-- **Quantization-aware training (QAT)** — not built.
 - **Analytical hardware cost model** — the sweep cost metric is an
   *estimated* normalized weight-storage-bits proxy;
   `configs/hardware/generic_edge_npu.yaml` is a fictional,
