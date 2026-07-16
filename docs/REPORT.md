@@ -59,6 +59,27 @@ overlap (Jaccard on assignment sets 0.161 / 0.065 / 0.138).*
   ranking beat a native one — consistent with noise-dominated
   rankings.
 
+### Follow-up: analytical hardware cost model (ADR-014)
+
+The Pareto figure above uses B3's historical *weight-bits proxy* cost,
+preserved as recorded. ADR-014 later replaced the proxy with a
+profile-driven analytical model (fictional `generic_edge_npu` profile,
+schema v1; all coefficients are assumptions and every cost is
+**estimated** for the modeled quantizable workload only — no latency,
+energy, or throughput was measured). Re-scoring the same frozen 256
+configurations per checkpoint: rank correlation with the proxy is
+Spearman ρ = 0.886 (identical across checkpoints — cost depends only
+on the assignment); Pareto-frontier membership shifts with Jaccard
+0.609 / 0.462 / 0.300 (seeds 0/1/2); and budget recommendations at
+normalized costs 0.60/0.75/0.90 changed in 7 of 9 checkpoint×budget
+cells. Mechanism example: configurations tied under the weight-bits
+proxy separate once activation traffic counts — quantizing the stem
+(few weights, large early activation maps) is nearly free to the
+proxy but materially cheaper under the profile. Artifacts:
+`runs/validation-012/texture-a-seed{0,1,2}-hwcost/`,
+`runs/validation-012/hwcost-study-summary.json` (component-wise
+costs, lineage hashes, and recommendations; provenance labeled).
+
 ## C — backend parity (validation, with two compatibility findings)
 
 C validates **QuantScope's Torch-2.2-compatible arithmetic and backend

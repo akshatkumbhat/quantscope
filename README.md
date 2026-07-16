@@ -78,13 +78,24 @@ metrics with mandatory measured/simulated/estimated provenance labels;
 `scripts/build_report.py` regenerates the report figures
 byte-deterministically from artifacts with a hash manifest.
 
+**Analytical hardware cost model** (`quantscope.hardware`, ADR-014) —
+a validated schema-v1 profile format (Pydantic, fictional-by-
+declaration, duplicate-pair detection), deterministic model accounting
+with a declared no-cache single-read/single-write-per-tensor traffic
+assumption and explicit exclusion lists, and transparent
+component-wise *estimated* costs (compute / weight-memory /
+activation-memory / overhead) normalized to all-INT8 = 1.0. Generates
+checkpoint-specific mixed-precision recommendations at normalized
+budgets 0.60/0.75/0.90 from the frozen B3 sweeps, and quantifies how
+the profile changes conclusions vs the old weight-bits proxy
+(Spearman ρ 0.886; Pareto membership Jaccard 0.30–0.61;
+recommendations changed in 7 of 9 checkpoint×budget cells). The
+`generic_edge_npu` profile is fictional — its coefficients are
+assumptions, not calibrated hardware facts, and costs cover the
+modeled quantizable workload only.
+
 ## Not implemented (honest gaps)
 
-- **Analytical hardware cost model** — the sweep cost metric is an
-  *estimated* normalized weight-storage-bits proxy;
-  `configs/hardware/generic_edge_npu.yaml` is a fictional,
-  illustrative profile and no code consumes it yet
-  (`quantscope.hardware` is a stub).
 - **Numerical-regression test harness** — not built.
 - Deferred experiment appendices: W3A3 stress test; Q4 sim↔backend
   observer comparison at W8A8 (rationale in ADR-012 addendum 6).
@@ -122,6 +133,8 @@ provenance label and unlabeled metrics are refused.
 | `quantscope ablate --seed N` | per-group W4A4 sensitivity ablation |
 | `quantscope sweep --seed N` | exhaustive 256-config mixed-precision sweep |
 | `quantscope backend-parity --seed N` | QuantScope↔Torch INT8 parity harness |
+| `quantscope hw-validate --profile <yaml>` | validate a schema-v1 hardware profile |
+| `quantscope hw-score --bits 4,8,…` | component-wise estimated cost of one assignment |
 
 Training/benchmark commands are slow-path (minutes); core tests and
 quick mode stay fast.

@@ -1493,3 +1493,48 @@ scoring → B3 enrichment/recommendation script → invariant/
 integration/provenance/determinism tests → results addendum →
 README/report alignment. The numerical-regression harness waits until
 ADR-014 closes.
+
+### ADR-014 addendum 2: results — PASSED all success criteria
+(2026-07-16)
+
+Artifacts: `runs/validation-012/texture-a-seed{0,1,2}-hwcost/`
+(per-config component tables written atomically with full lineage) and
+`runs/validation-012/hwcost-study-summary.json`. Profile canonical
+digest c4bfa0c4…, accounting digest 45d0471b…, group-order-v1,
+traffic model single-read-single-write-per-tensor-v1. B3 originals
+untouched.
+
+- Schema + rewritten generic profile validate; the legacy v0 format is
+  preserved as a fixture and provably rejected.
+- Accounting reconciles deterministically (tensor-identity tests) and
+  all invariant tests pass (31 hardware tests).
+- All 256 configurations per checkpoint carry component-wise estimated
+  costs; all-INT8 normalized cost is exactly 1.0; all-INT4 is 0.5498;
+  every mixed configuration lies within bounds.
+- **All nine checkpoint×budget cells feasible** (all-INT4 0.5498 <
+  0.60): e.g. seed 0 recommendations — budget 0.60: NLL 0.1404 / acc
+  94.45% at cost 0.5599; 0.75: NLL 0.1144 / 95.50% at 0.7497; 0.90:
+  NLL 0.1115 / 95.75% at 0.8728 (NLL/accuracy simulated, costs
+  estimated). Recommendations are checkpoint-specific and never
+  averaged.
+- **Proxy comparison** (historical weight-bits baseline, unrewritten):
+  Spearman ρ = 0.8858 — identical on all three checkpoints because
+  costs depend only on the assignment, not the checkpoint. Pareto
+  membership shifts: Jaccard 0.609 / 0.462 / 0.300 (seeds 0/1/2);
+  recommendations changed in 7 of 9 checkpoint×budget cells. Concrete
+  reversal: two configurations tied at old proxy cost 0.9296 separate
+  to 0.8667 vs 0.8729 normalized — quantizing the stem (few weights,
+  large early activation maps) is nearly free under the weight-bits
+  proxy but saves real activation traffic and compute under the
+  profile. High-but-not-perfect correlation is exactly the expected
+  behavior: the new model adds compute and activation terms the proxy
+  omitted.
+- No measured performance claim anywhere; every cost labeled
+  estimated; the supported claim is exactly the preregistered one
+  (QuantScope consumes an explicit profile, computes transparent
+  component-wise estimated costs, and shows how hardware assumptions
+  change recommendations — under a fictional profile whose
+  coefficients are assumptions).
+
+**ADR-014 PASSES.** The weight-bits proxy remains in the historical B3
+artifacts as recorded.

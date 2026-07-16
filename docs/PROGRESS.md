@@ -234,10 +234,32 @@ addenda 2–4); B2's checkpoint-conditioned-sensitivity conclusion stands.
 
 **QAT (ADR-013) is complete.**
 
+## Hardware cost model status (2026-07-16)
+
+- [x] ADR-014 preregistered (draft + amendments) before code.
+- [x] `quantscope.hardware`: schema-v1 profile (Pydantic,
+  extra=forbid, list-based coefficients with duplicate-pair
+  detection, fictional:true required, dual hashes); legacy v0 profile
+  preserved as a rejected fixture; deterministic accounting with
+  versioned group-order-v1 and tensor-identity reconciliation;
+  float64 component-wise costs; hw-validate / hw-score CLI; 31 tests.
+- [x] Enrichment study ran once on the frozen B3 tables (originals
+  untouched, atomic writes, full lineage): **ADR-014 PASSED all
+  success criteria** (addendum 2). All-INT4 normalized 0.5498;
+  all nine checkpoint×budget cells feasible; proxy comparison
+  Spearman 0.886, Pareto Jaccard 0.30–0.61, recommendations changed
+  7/9 cells, concrete stem-activation reversal example. All costs
+  estimated; fictional profile; no measured performance claims.
+- [x] README and REPORT.md aligned (hardware cost model moved out of
+  honest gaps; report notes the historical proxy stays in B3
+  figures).
+
+**ADR-014 is complete.**
+
 ## Next actions
 
-1. Hardware cost model; numerical-regression harness
-   (definition-of-done gaps) — pending separate approval.
+1. Numerical-regression harness (last definition-of-done gap) —
+   pending separate approval.
 3. Optional appendix list (deferred, run only if separately
    approved): W3A3 stress test; Q4 sim_custom ↔ backend-matched
    W8A8 comparison (rationale in ADR-012 addendum 6); re-validating
