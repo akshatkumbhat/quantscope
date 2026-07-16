@@ -1,34 +1,38 @@
-# Generic Edge NPU — FICTIONAL hardware profile.
+# Generic Edge NPU — FICTIONAL hardware profile (schema v1, ADR-014).
 #
-# This profile is illustrative only. It does not represent, emulate, or
-# approximate any real accelerator, including any Quadric product. All cost
-# model outputs derived from it are ESTIMATED values.
+# Every coefficient below is an assumption, not a calibrated hardware
+# fact. Cost-model outputs derived from this file are ESTIMATED values
+# for the modeled quantizable workload only. The legacy pre-schema
+# version of this file is preserved verbatim at
+# tests/fixtures/hardware/generic_edge_npu_legacy_v0.yaml.
 
-name: generic_edge_npu
-description: Fictional edge NPU profile for analytical cost modeling.
-provenance: estimated
-
-precisions:
-  int8:
-    supported: true
-    relative_compute_throughput: 1.0   # baseline
-    bytes_per_element: 1
-  int4:
-    supported: true
-    relative_compute_throughput: 1.8   # fictional speedup vs int8
-    bytes_per_element: 0.5
-  fp32:
-    supported: true                    # fallback path, heavily penalized
-    relative_compute_throughput: 0.1
-    bytes_per_element: 4
-
-memory:
-  dram_bandwidth_gb_per_s: 8.0         # fictional
-  on_chip_buffer_kib: 512              # fictional
-
-layer_support:
-  conv2d: [int4, int8, fp32]
-  linear: [int4, int8, fp32]
-  depthwise_conv2d: [int8, fp32]       # fictional: no int4 depthwise
-  batchnorm: [fp32]
-  activation: [int8, fp32]
+schema_version: 1
+profile_name: generic_edge_npu
+description: Fictional edge-NPU profile for analytical cost modeling.
+fictional: true
+disclaimer: >-
+  This profile is illustrative only. It does not represent, emulate, or
+  approximate any real accelerator, including any Quadric product. All
+  cost-model outputs derived from it are ESTIMATED values; nothing here
+  is a latency, energy, or throughput measurement.
+assumptions:
+  - "1 ncu is defined as the estimated cost of one INT8xINT8 MAC on this profile."
+  - "Memory coefficients model a flat DRAM path; no cache hierarchy."
+  - "Traffic: one read and one write per distinct modeled activation tensor,
+    counted at the producing group's precision; no per-consumer multiplier."
+  - "Accumulator precision is recorded but does not enter the v1 calculation."
+  - "BatchNorm, residual adds, pooling, flatten, output logits, and
+    quantize/dequantize boundaries are excluded constants."
+unit: "ncu = estimated cost of one INT8xINT8 MAC (normalized cost unit)"
+traffic_model: single-read-single-write-per-tensor-v1
+compute_ncu_per_mac:
+  - { weight_bits: 8, activation_bits: 8, ncu: 1.0 }
+  - { weight_bits: 4, activation_bits: 4, ncu: 0.55 }
+  - { weight_bits: 4, activation_bits: 8, ncu: 0.75 }
+  - { weight_bits: 8, activation_bits: 4, ncu: 0.80 }
+weight_memory_ncu_per_bit: 0.02
+activation_memory_ncu_per_bit: 0.02
+per_layer_overhead_ncu: 0.0
+accumulator_bits: 32
+supported_weight_bits: [4, 8]
+supported_activation_bits: [4, 8]

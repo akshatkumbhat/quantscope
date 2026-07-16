@@ -213,5 +213,62 @@ def texture_bench(
         )
 
 
+@app.command()
+def hw_validate(
+    profile: Path = typer.Option("configs/hardware/generic_edge_npu.yaml", "--profile"),
+) -> None:
+    """Validate a schema-v1 hardware profile and print its summary (estimated model)."""
+    from quantscope.hardware import load_hardware_profile
+
+    loaded = load_hardware_profile(profile)
+    p = loaded.profile
+    typer.echo(f"profile: {p.profile_name} (schema v{p.schema_version}, fictional={p.fictional})")
+    typer.echo(f"source sha256:    {loaded.source_sha256}")
+    typer.echo(f"canonical digest: {loaded.canonical_digest}")
+    typer.echo(f"unit: {p.unit}")
+    typer.echo(f"traffic model: {p.traffic_model}")
+    for entry in p.compute_ncu_per_mac:
+        typer.echo(f"  compute {entry.label}: {entry.ncu} ncu/MAC (estimated)")
+    typer.echo(
+        f"  memory: weights {p.weight_memory_ncu_per_bit} ncu/bit, "
+        f"activations {p.activation_memory_ncu_per_bit} ncu/bit, "
+        f"overhead {p.per_layer_overhead_ncu} ncu/layer (estimated)"
+    )
+    typer.echo("VALID")
+
+
+@app.command()
+def hw_score(
+    bits: str = typer.Option(..., "--bits", help="8 per-group bits, e.g. 4,8,8,4,4,8,8,4"),
+    profile: Path = typer.Option("configs/hardware/generic_edge_npu.yaml", "--profile"),
+) -> None:
+    """Component-wise ESTIMATED cost of one mixed-precision assignment."""
+    from quantscope.benchmark import benchmark_config
+    from quantscope.hardware import (
+        account_model,
+        config_identifier,
+        configuration_cost,
+        load_hardware_profile,
+    )
+    from quantscope.models.tiny_cnn import build_model
+
+    loaded = load_hardware_profile(profile)
+    values = [int(b) for b in bits.split(",")]
+    assignment = [(b, b) for b in values]  # B3 semantics: each group W4A4 or W8A8
+    accounting = account_model(build_model(benchmark_config(seed=0).model))
+    cost = configuration_cost(accounting, assignment, loaded.profile)
+    baseline = configuration_cost(accounting, [(8, 8)] * len(values), loaded.profile)
+    typer.echo(f"configuration: {config_identifier(assignment)}")
+    for name, comp in cost.per_group.items():
+        typer.echo(
+            f"  {name:<15} compute {comp.compute:12.1f}  wmem {comp.weight_memory:10.1f}  "
+            f"amem {comp.activation_memory:10.1f}  total {comp.total:12.1f} ncu (estimated)"
+        )
+    typer.echo(
+        f"total {cost.total:.1f} ncu (estimated); normalized vs all-INT8 "
+        f"{cost.total / baseline.total:.4f} — modeled quantizable workload only"
+    )
+
+
 if __name__ == "__main__":
     app()
