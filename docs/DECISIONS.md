@@ -1203,3 +1203,206 @@ quantization can adapt a checkpoint to the frozen W4A4 quantizer* —
 simulated throughout; no real INT4 execution or latency claim.
 Artifacts: `runs/validation-012/texture-a-seed{0,1,2}-qat-w4a4/`,
 `runs/validation-012/qat-study-summary.json`.
+
+## ADR-014: analytical hardware cost model + mixed-precision
+recommendations (DRAFT preregistration, 2026-07-15 — committed before
+any cost-model code; implementation starts only after user review)
+
+### Objective and claim boundary
+
+Replace the weight-bits proxy (`search.exhaustive.config_cost`) with a
+validated, profile-driven analytical cost model, and use it to
+generate mixed-precision recommendations from the existing B3
+exhaustive sweep tables. Every hardware cost and recommendation is
+**estimated**; no latency, energy, or throughput value may be
+described as measured. The intended claim is exactly:
+
+> QuantScope can consume an explicit hardware profile, calculate
+> transparent component-wise estimated costs, and show how hardware
+> assumptions change mixed-precision recommendations.
+
+The claim is NOT that `generic_edge_npu` is accurate or represents
+any commercial accelerator. The profile remains fictional. Agreement
+with the old proxy is a valid, documentable result.
+
+### Frozen experimental inputs (no reruns)
+
+The three B3 sweep tables
+(`runs/validation-012/texture-a-seed{0,1,2}-sweep/sweep_table.json`):
+256 assignments per checkpoint over the frozen eight policy-v1
+quantization groups, each group W4A4 or W8A8 (the sweep assigned
+`SimQuantConfig(b, b)` per group), with simulated NLL/accuracy. No
+training, inference, calibration, or quantization is rerun to build
+the cost model.
+
+### Hardware profile schema (Pydantic, versioned)
+
+`configs/hardware/generic_edge_npu.yaml` is the initial profile but
+its CURRENT contents are not assumed valid; it will be rewritten to
+the schema below (existing fields preserved only where they fit).
+
+Proposed schema (`HardwareProfile`, `schema_version: 1`):
+
+- `name: str`, `schema_version: int` (only 1 accepted),
+  `description: str`, `fictional: bool` (must be true for this
+  profile; a disclaimer string is required),
+  `assumptions: list[str]` (non-empty).
+- `unit: str` — the normalized cost unit. Declared definition:
+  **1 ncu = the estimated cost of one INT8×INT8 MAC on this
+  profile.** Every coefficient carries this unit via its field name.
+- `compute_ncu_per_mac: dict[str, float]` keyed by `"W{w}A{a}"` —
+  a coefficient for each supported (weight_bits, activation_bits)
+  pair. Proposed fictional values: W8A8 1.0, W4A4 0.55, W4A8 0.75,
+  W8A4 0.80 (the sweep uses only W8A8/W4A4; the extra pairs
+  exercise the schema).
+- `weight_memory_ncu_per_bit: float` (proposed fictional 0.02).
+- `activation_memory_ncu_per_bit: float` (proposed fictional 0.02).
+- `per_layer_overhead_ncu: float` (proposed 0.0; the field is
+  explicit so overhead is only ever counted when the profile
+  declares it).
+- `accumulator_bits: int` (32; recorded, NOT used by the v1
+  calculation — documented).
+- `supported_weight_bits: list[int]`, `supported_activation_bits:
+  list[int]` (both [4, 8]).
+
+Validation rejects: unknown precision pairs referenced by a model
+configuration; pairs in the table not covered by supported bit lists;
+negative, NaN, or infinite coefficients; missing units (enforced by
+field naming + `unit`); duplicate pair keys; `schema_version != 1`;
+profiles missing any pair a scored configuration needs; and
+`fictional: false` for this profile file.
+
+### Model accounting (deterministic analysis pass)
+
+One shape-instrumented forward pass of the FP32 BottleneckResNet at
+the benchmark input size (1×1×32×32) records, per quantization group:
+parameter count; MAC count (conv: out_elems × in_C × kH × kW; linear:
+in × out); input/output activation element counts and tensor shapes;
+the assigned (weight_bits, activation_bits); and the explicit
+exclusion list. Repeated runs must produce identical accounting; the
+accounting JSON is hashed (SHA-256) into every downstream artifact.
+
+**Declared traffic assumption (v1, visible in artifacts and docs):**
+no-cache, single-read/single-write per distinct tensor. Each
+quantized activation tensor is counted ONCE for write and ONCE for
+read at the precision of its *producing* group, with no
+per-consumer multiplier — so activations shared by residual paths
+are not double-counted. The model input is counted as one read at
+the stem group's activation precision (the stem group owns input
+quantization). Consumer groups add no read terms of their own.
+
+**Documented exclusions (recorded in every artifact):** BatchNorm
+(unfolded under policy v1), residual adds, pooling, flatten, and the
+classifier logits (unquantized float island under policy v1) carry
+no compute coefficient and no activation-memory term; they are
+constant across all 256 configurations and excluded from totals.
+
+### Cost equations (component-wise; never one opaque score)
+
+For group g with assignment (w_g, a_g):
+
+- `compute_g = MACs_g × compute_ncu_per_mac["W{w_g}A{a_g}"]`
+- `wmem_g = weight_elements_g × w_g × weight_memory_ncu_per_bit`
+- `amem_g = Σ_{tensors produced by g} 2 × elements × a_g ×
+  activation_memory_ncu_per_bit` (+ the input-read term for the stem
+  group: `elements × a_stem × activation_memory_ncu_per_bit`)
+- `overhead_g = quantized_layer_count_g × per_layer_overhead_ncu`
+- `total_g = compute_g + wmem_g + amem_g + overhead_g`
+- `model_total = Σ_g total_g` — a plain declared sum; all four
+  components are reported per group and per model in every artifact.
+
+Normalization: costs are reported both in raw ncu and normalized to
+the all-INT8 configuration of the same checkpoint (all-INT8 ≡ 1.0
+exactly). The all-INT4 normalized cost is also reported, and every
+mixed configuration must lie in [all-INT4, all-INT8] normalized cost
+(no documented float-island exception applies to totals, since the
+excluded constants are outside the sum).
+
+### Predeclared invariant tests (internal consistency, not realism)
+
+1. All-INT4 total < all-INT8 total under `generic_edge_npu`.
+2. Lowering one group from (8,8) to (4,4) with all others held fixed
+   strictly reduces that group's compute, weight-memory, and
+   activation-memory components, and never increases any other
+   group's components.
+3. `model_total` equals the sum of the reported components (exact,
+   same float path).
+4. Repeated analysis is deterministic (identical accounting JSON and
+   hashes across runs).
+5. Per-group totals reconcile with the whole-model total.
+6. Unsupported precision assignments fail loudly (actionable error).
+7. Schema validation rejects each malformed-profile case listed
+   above (one test per rejection rule).
+
+### Mixed-precision recommendations
+
+Per checkpoint (never averaged into a universal assignment):
+
+1. Recompute the exact NLL-vs-estimated-cost Pareto frontier over all
+   256 configurations under the new cost model.
+2. For each prospective normalized-cost budget **0.60, 0.75, 0.90**:
+   recommend the configuration with the lowest simulated NLL whose
+   normalized estimated cost is ≤ the budget. If no configuration is
+   feasible, report infeasibility explicitly (never silently pick the
+   cheapest).
+3. Exact-NLL ties break deterministically: (a) lower estimated cost;
+   (b) higher simulated accuracy; (c) lexicographically smallest
+   configuration identifier, defined as the per-group bits tuple
+   joined with "-" in frozen group-dict order (e.g.
+   "4-8-8-4-4-8-8-4").
+
+### Comparison with the old weight-bits proxy (per checkpoint)
+
+- Spearman rank correlation across all 256 configurations
+  (new normalized cost vs old proxy cost).
+- Pareto-frontier membership changes (set difference + Jaccard).
+- Recommendation changes at each budget (old-cost budgets evaluated
+  at the same 0.60/0.75/0.90 levels for the comparison).
+- Concrete examples where activation-memory or compute terms reorder
+  configuration pairs that the weight-bits proxy tied or ordered
+  oppositely.
+
+### Success criteria (frozen)
+
+ADR-014 passes iff: the schema and the rewritten generic profile
+validate; model accounting reconciles deterministically; all invariant
+tests pass; all 256 configurations per checkpoint receive transparent
+component-wise costs; checkpoint-specific recommendations exist for
+every feasible budget (with explicit infeasibility reports otherwise);
+at least one artifact records the traffic assumption, exclusion list,
+profile SHA-256, accounting SHA-256, and provenance labels; every cost
+and recommendation is labeled **estimated**; and no measured
+performance claim is introduced anywhere. The new model is NOT
+required to disagree with the old proxy.
+
+### Deliverables and artifact format
+
+- `src/quantscope/hardware/`: `profile.py` (Pydantic schema +
+  loader/validator), `accounting.py` (model analysis pass),
+  `cost.py` (component calculation + normalization).
+- CLI: `quantscope hw-validate --profile <yaml>` (validate + print a
+  summary) and `quantscope hw-score --seed N --bits 4,8,...`
+  (component-wise cost for one assignment).
+- `scripts/run_hwcost_study.py`: enriches the existing B3 sweep
+  artifacts WITHOUT modifying the originals — writes
+  `runs/validation-012/texture-a-seed{s}-hwcost/` via RunWriter
+  (kind="hwcost") containing `hwcost_table.json` (per-config
+  component costs, raw + normalized), the recomputed Pareto frontier,
+  the budget recommendations, the proxy comparison, the assumptions
+  block, and the profile/accounting hashes; every metric labeled
+  ESTIMATED (task metrics quoted from B3 stay labeled SIMULATED).
+- Unit + integration tests per the invariant list; fast and offline.
+- ADR-014 results addendum; report/README alignment AFTER results.
+
+### Scope exclusions
+
+No accelerator latency benchmarking; no fitting coefficients to task
+results; no claim that generic_edge_npu represents a commercial
+accelerator; no B3 inference reruns; no numerical-regression harness;
+no Q4 or W3A3; the Torch 2.2.2 guard stays; QAT, observer, and
+generator conclusions unchanged.
+
+### Status
+
+DRAFT — awaiting user review. The hardware module is not implemented
+until this preregistration is approved.
