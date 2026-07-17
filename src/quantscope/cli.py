@@ -270,5 +270,110 @@ def hw_score(
     )
 
 
+regression_app = typer.Typer(
+    name="regression",
+    help="Numerical-regression harness (ADR-015). Exit codes: 0 pass, "
+    "1 regression, 2 malformed/incompatible input.",
+    no_args_is_help=True,
+)
+app.add_typer(regression_app, name="regression")
+
+
+def _load_artifact(path: Path) -> dict:
+    import json
+
+    from quantscope.regression import HarnessError
+
+    if not path.exists():
+        raise HarnessError(f"artifact not found: {path}")
+    try:
+        return json.loads(path.read_text())
+    except json.JSONDecodeError as error:
+        raise HarnessError(f"artifact {path} is not valid JSON: {error}") from error
+
+
+def _harness_exit(error: Exception) -> None:
+    typer.echo(f"HARNESS ERROR (exit 2): {error}", err=True)
+    raise typer.Exit(2)
+
+
+@regression_app.command("smoke")
+def regression_smoke(out: Path = typer.Option(..., "--out")) -> None:
+    """Generate the deterministic offline smoke artifact (no training)."""
+    from quantscope.regression import write_smoke_artifact
+
+    write_smoke_artifact(out)
+    typer.echo(f"smoke artifact: {out}")
+
+
+@regression_app.command("validate-baseline")
+def regression_validate_baseline(baseline: Path = typer.Argument(...)) -> None:
+    """Validate a baseline file (schema, canonical digest, rule uniqueness)."""
+    from quantscope.regression import HarnessError, load_baseline
+
+    try:
+        spec = load_baseline(baseline)
+    except HarnessError as error:
+        _harness_exit(error)
+    typer.echo(
+        f"baseline {spec.baseline_name!r}: {len(spec.rules)} rules, digest "
+        f"{spec.canonical_digest[:12]}… VALID"
+    )
+
+
+@regression_app.command("check")
+def regression_check(
+    artifact: Path = typer.Argument(...),
+    baseline: Path = typer.Option(..., "--baseline"),
+    diff_out: Path | None = typer.Option(None, "--diff-out"),
+) -> None:
+    """Check an artifact against a baseline. Never updates baselines."""
+    from quantscope.regression import HarnessError, check_artifact, load_baseline, write_diff
+
+    try:
+        spec = load_baseline(baseline)
+        report = check_artifact(_load_artifact(artifact), spec)
+    except HarnessError as error:
+        _harness_exit(error)
+    if diff_out is not None:
+        write_diff(report, diff_out)
+    if report.passed:
+        typer.echo(f"PASS: {len(report.entries)} checks against {spec.baseline_name!r}")
+        return
+    counts = ", ".join(f"{k}: {v}" for k, v in sorted(report.failure_counts().items()))
+    typer.echo(f"REGRESSION (exit 1): {len(report.failures)} failed checks ({counts})")
+    for entry in report.failures[:5]:
+        typer.echo(
+            f"  {entry.path}: expected {entry.expected!r}, got {entry.actual!r} "
+            f"({entry.explanation})"
+        )
+    if len(report.failures) > 5:
+        typer.echo(f"  … {len(report.failures) - 5} more")
+    if diff_out is not None:
+        typer.echo(f"full structured diff: {diff_out}")
+    raise typer.Exit(1)
+
+
+@regression_app.command("capture")
+def regression_capture(
+    artifact: Path = typer.Argument(...),
+    output: Path = typer.Option(..., "--output"),
+    overwrite: bool = typer.Option(False, "--overwrite"),
+) -> None:
+    """Propose a baseline from an artifact (a code-review decision; never CI)."""
+    import json
+
+    from quantscope.regression import HarnessError, capture_baseline
+
+    try:
+        spec, comparison = capture_baseline(_load_artifact(artifact), output, overwrite=overwrite)
+    except HarnessError as error:
+        _harness_exit(error)
+    typer.echo(f"proposed baseline: {output} ({len(spec.rules)} rules) — review before commit")
+    if comparison is not None:
+        typer.echo("comparison with previous baseline:")
+        typer.echo(json.dumps(comparison, indent=2, sort_keys=True))
+
+
 if __name__ == "__main__":
     app()

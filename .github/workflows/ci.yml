@@ -38,3 +38,12 @@ jobs:
         run: |
           quantscope --help
           quantscope version-info
+      - name: Numerical-regression smoke check
+        run: |
+          quantscope regression smoke --out /tmp/smoke.json
+          quantscope regression validate-baseline tests/baselines/smoke.json
+          quantscope regression check /tmp/smoke.json \
+            --baseline tests/baselines/smoke.json --diff-out /tmp/smoke-diff.json
+      - name: Show regression diff on failure
+        if: failure()
+        run: cat /tmp/smoke-diff.json 2>/dev/null || echo "no diff artifact produced"
