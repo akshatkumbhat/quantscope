@@ -1782,3 +1782,19 @@ before approval.
 ### Status
 
 DRAFT — awaiting user review before any regression-harness code.
+
+### ADR-015 addendum: approved as drafted (2026-07-16) —
+implementation authorized
+
+The draft is approved without amendment: JSON Pointer paths, the
+two-config smoke artifact (W8A8 + W4A4, with the preregistered
+fallback), the untrained seeded TinyCNN target, the reused
+BottleneckResNet accounting for the cost component, and the tolerance
+table all stand. One implementation clarification recorded now:
+`provenance` is required on every metric rule (exact/close/no_worse
+against `{value, provenance}` leaves); plain identity strings (e.g.
+`/identifiers/*`, digests) may use exact rules with no provenance
+field, since they are configuration facts rather than measured/
+simulated/estimated quantities. Environment-gate violations classify
+as harness/configuration errors (exit 2): running under the wrong
+torch is an incompatible input, not a code regression.
