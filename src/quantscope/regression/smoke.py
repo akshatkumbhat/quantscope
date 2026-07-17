@@ -59,6 +59,16 @@ _NUMPY_SCALE = {
     "rtol": 1e-7,
     "rationale": "scales stored float32; headroom only for libm-level platform variation",
 }
+# ReLU-site scales are min-max extremes of activations computed THROUGH
+# float32 torch convolutions: cross-BLAS builds differ by a few ulps
+# (~1e-7 relative, observed on Linux CI vs the macOS capture), so they
+# take the torch family, quantified before widening (ADR-015).
+_TORCH_SCALE = {
+    "atol": 1e-9,
+    "rtol": 1e-5,
+    "rationale": "activation extremes pass through float32 torch convs; cross-BLAS "
+    "differences of a few ulps (~1e-7 rel observed) with 1e-5 headroom",
+}
 _HW_COST = {
     "atol": 1e-12,
     "rtol": 0.0,
@@ -244,13 +254,14 @@ def build_smoke_baseline(artifact: dict, *, capture_command: str) -> BaselineSpe
         if "scales" in body:
             for site, leaf in sorted(body["scales"].items()):
                 pointer = site.replace("~", "~0").replace("/", "~1")
+                family = _NUMPY_SCALE if site == "__input__" else _TORCH_SCALE
                 rules.append(
                     CheckRule(
                         path=f"/sections/{section}/scales/{pointer}",
                         comparator=ComparatorType.CLOSE,
                         expected=leaf["value"],
                         provenance="measured",
-                        **_NUMPY_SCALE,
+                        **family,
                     )
                 )
             for site, leaf in sorted(body["zero_points"].items()):

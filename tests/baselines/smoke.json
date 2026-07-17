@@ -2,7 +2,7 @@
   "artifact_type": "regression-smoke",
   "baseline_name": "smoke",
   "baseline_schema_version": 1,
-  "canonical_digest": "3ada77323c685ba3fb4437081fdf8906e398c9ddd1d55aa50bff22b992486571",
+  "canonical_digest": "afc2c3028896ebad135fdb65e0f06bc60ae4b443ace13f0520103e237b347450",
   "capture_command": "quantscope regression capture <artifact> --output smoke.json",
   "compatible_artifact_schema_versions": [
     1
@@ -346,10 +346,10 @@
       "expected": 0.00670166639611125,
       "path": "/sections/w8a8/scales/features.2",
       "provenance": "measured",
-      "rationale": "scales stored float32; headroom only for libm-level platform variation",
+      "rationale": "activation extremes pass through float32 torch convs; cross-BLAS differences of a few ulps (~1e-7 rel observed) with 1e-5 headroom",
       "required_keys": null,
       "required_length": null,
-      "rtol": 1e-07
+      "rtol": 1e-05
     },
     {
       "allow_extra_elements": false,
@@ -361,10 +361,10 @@
       "expected": 0.0035101096145808697,
       "path": "/sections/w8a8/scales/features.6",
       "provenance": "measured",
-      "rationale": "scales stored float32; headroom only for libm-level platform variation",
+      "rationale": "activation extremes pass through float32 torch convs; cross-BLAS differences of a few ulps (~1e-7 rel observed) with 1e-5 headroom",
       "required_keys": null,
       "required_length": null,
-      "rtol": 1e-07
+      "rtol": 1e-05
     },
     {
       "allow_extra_elements": false,
@@ -534,10 +534,10 @@
       "expected": 0.11373435705900192,
       "path": "/sections/w4a4/scales/features.2",
       "provenance": "measured",
-      "rationale": "scales stored float32; headroom only for libm-level platform variation",
+      "rationale": "activation extremes pass through float32 torch convs; cross-BLAS differences of a few ulps (~1e-7 rel observed) with 1e-5 headroom",
       "required_keys": null,
       "required_length": null,
-      "rtol": 1e-07
+      "rtol": 1e-05
     },
     {
       "allow_extra_elements": false,
@@ -549,10 +549,10 @@
       "expected": 0.05906881019473076,
       "path": "/sections/w4a4/scales/features.6",
       "provenance": "measured",
-      "rationale": "scales stored float32; headroom only for libm-level platform variation",
+      "rationale": "activation extremes pass through float32 torch convs; cross-BLAS differences of a few ulps (~1e-7 rel observed) with 1e-5 headroom",
       "required_keys": null,
       "required_length": null,
-      "rtol": 1e-07
+      "rtol": 1e-05
     },
     {
       "allow_extra_elements": false,
