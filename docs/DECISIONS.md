@@ -1798,3 +1798,37 @@ field, since they are configuration facts rather than measured/
 simulated/estimated quantities. Environment-gate violations classify
 as harness/configuration errors (exit 2): running under the wrong
 torch is an incompatible input, not a code regression.
+
+### ADR-015 addendum 2: results — PASSED all success criteria
+(2026-07-17)
+
+- Harness implemented as preregistered: schema-v1 baselines with
+  canonical digests, RFC 6901 paths, exact/close/no_worse/structure
+  comparators (float64, finite-only), provenance rules that fail on
+  label changes with unchanged values, exit codes 0/1/2, deterministic
+  timestamp-free diff artifacts, capture with overwrite protection and
+  reviewable comparisons. 25 harness tests incl. boundary semantics
+  and the deliberate-perturbation test (exact path, expected/actual,
+  tolerances, and category verified).
+- Smoke artifact: deterministic (byte-identical regeneration) and
+  offline, ~7 s; committed baseline `tests/baselines/smoke.json`
+  (37 rules).
+- **One real finding during rollout, caught by the harness itself:**
+  the macOS-captured baseline failed on Linux CI at
+  `/sections/w4a4/scales/features.6` — a few-float32-ulp (~1e-7
+  relative) cross-BLAS difference in a ReLU-site scale. Quantified
+  before widening, per protocol: root cause was a tolerance-family
+  misclassification (ReLU-site scales pass through float32 torch
+  convolutions; only the `__input__` scale is pure NumPy data). The
+  torch-derived scale family now carries rtol 1e-5 with a written
+  rationale; the re-capture went through the explicit overwrite
+  workflow and its reviewable comparison shows zero changed
+  expectations and zero added/removed paths.
+- CI green on Python 3.11 and 3.12 (run 29621583250) including the
+  smoke generate→validate→check step; fast suite 283 tests in ~21 s
+  (sub-minute target held); clean-clone verification passed (fresh
+  clone installs, full fast suite green, its smoke artifact passes
+  the committed baseline).
+
+**ADR-015 PASSES. With it, every mandatory item in the CLAUDE.md
+definition of done is implemented.**

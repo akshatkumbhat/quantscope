@@ -256,10 +256,29 @@ addenda 2–4); B2's checkpoint-conditioned-sensitivity conclusion stands.
 
 **ADR-014 is complete.**
 
+## Regression harness status (2026-07-17)
+
+- [x] ADR-015 preregistered (draft + approval) before code.
+- [x] `quantscope.regression`: baseline schema v1 (canonical digests,
+  explicit tolerances with rationales), JSON Pointer paths, four
+  comparators, provenance enforcement, exit codes 0/1/2,
+  deterministic diffs, capture with overwrite protection; regression
+  CLI sub-app; committed 37-rule smoke baseline; 25 tests incl. the
+  deliberate-perturbation test; CI smoke step on 3.11 + 3.12.
+- [x] The harness caught a real cross-platform finding during
+  rollout (few-ulp cross-BLAS difference in a torch-derived scale);
+  quantified, family reclassified with rationale, baseline re-captured
+  through the reviewed overwrite workflow (zero changed expectations).
+- [x] **ADR-015 PASSED all success criteria** (addendum 2): CI green
+  on both Python versions, fast suite ~21 s, clean-clone verification
+  succeeded.
+
+**Every mandatory definition-of-done item is now implemented.**
+
 ## Next actions
 
-1. Numerical-regression harness (last definition-of-done gap) —
-   pending separate approval.
+1. Optional appendix list only (run if separately approved): W3A3;
+   Q4; parity-simulator re-validation on newer torch.
 3. Optional appendix list (deferred, run only if separately
    approved): W3A3 stress test; Q4 sim_custom ↔ backend-matched
    W8A8 comparison (rationale in ADR-012 addendum 6); re-validating

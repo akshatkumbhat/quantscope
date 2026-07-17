@@ -94,11 +94,25 @@ recommendations changed in 7 of 9 checkpoint×budget cells). The
 assumptions, not calibrated hardware facts, and costs cover the
 modeled quantizable workload only.
 
-## Not implemented (honest gaps)
+**Numerical-regression harness** (`quantscope.regression`, ADR-015) —
+deterministic, provenance-aware baseline checks: versioned baseline
+schema with canonical digests and explicit per-metric tolerances
+(every nonzero tolerance carries a written rationale), JSON Pointer
+paths, exact/close/no-worse/structural comparators, exit codes that
+separate regressions (1) from malformed or incompatible inputs (2),
+machine-readable deterministic diffs, and a capture workflow where
+baseline updates are explicit code-review decisions. CI regenerates a
+seeded offline smoke artifact (FP32 measured, simulated W8A8/W4A4,
+qparams, one estimated hardware cost) and checks it against the
+committed baseline on Python 3.11 and 3.12.
 
-- **Numerical-regression test harness** — not built.
-- Deferred experiment appendices: W3A3 stress test; Q4 sim↔backend
-  observer comparison at W8A8 (rationale in ADR-012 addendum 6).
+## Deferred (optional appendices)
+
+Every mandatory capability above is implemented. Remaining optional
+items, run only if separately approved: W3A3 stress test; Q4
+sim↔backend observer comparison at W8A8 (rationale in ADR-012
+addendum 6); re-validating the parity simulator on newer torch
+(a deliberate ADR-011 guard decision, never incidental).
 
 ## Quickstart
 
@@ -135,6 +149,7 @@ provenance label and unlabeled metrics are refused.
 | `quantscope backend-parity --seed N` | QuantScope↔Torch INT8 parity harness |
 | `quantscope hw-validate --profile <yaml>` | validate a schema-v1 hardware profile |
 | `quantscope hw-score --bits 4,8,…` | component-wise estimated cost of one assignment |
+| `quantscope regression smoke/check/…` | numerical-regression harness (see `regression --help`) |
 
 Training/benchmark commands are slow-path (minutes); core tests and
 quick mode stay fast.
