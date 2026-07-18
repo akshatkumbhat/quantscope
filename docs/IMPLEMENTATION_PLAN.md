@@ -1,33 +1,20 @@
 # Implementation Plan
 
-## Phase 1
-- Inspect Python, PyTorch, torchvision, and quantization APIs.
-- Design configurations, artifacts, and architecture.
+Status: **all phases complete** (v0.1.0, 2026-07-18). This plan is
+retained for historical context; the authoritative records are
+`docs/PROGRESS.md` (chronology) and `docs/DECISIONS.md` (ADR-001..016
+with results). Definition-of-done verification lives in the ADR-015/
+016 result addenda (green CI on 3.11/3.12, clean-clone check).
 
-## Phase 2
-- Implement affine quantization mathematics.
-- Add comprehensive numerical tests.
-
-## Phase 3
-- Implement custom observers and numerical metrics.
-
-## Phase 4
-- Implement FP32 training, evaluation, calibration, and PTQ.
-
-## Phase 5
-- Implement layer-level numerical debugging.
-
-## Phase 6
-- Implement proxy and ablation sensitivity analysis.
-
-## Phase 7
-- Implement hardware profiles, cost modeling, and mixed-precision search.
-
-## Phase 8
-- Implement QAT.
-
-## Phase 9
-- Implement regression triage, reports, and visualizations.
-
-## Phase 10
-- Complete documentation, CI, and repository cleanup.
+| Phase | Scope | Outcome |
+| --- | --- | --- |
+| 1 | Environment inspection, config/artifact design | done (ADR-001..006) |
+| 2 | Affine quantization core + numerical tests | done |
+| 3 | Custom observers + error metrics | done (ADR-007) |
+| 4 | FP32 training, calibration, FX PTQ | done |
+| 5 | Layer-level numerical debugging | done (parity capture, ADR-011) |
+| 6 | Sensitivity analysis | done — honest negative finding (ADR-010) |
+| 7 | Hardware profiles, cost model, mixed-precision search | done (ADR-010/014) |
+| 8 | QAT | done + confound control (ADR-013/016) |
+| 9 | Regression harness, reports, visualizations | done (ADR-015, reporting/) |
+| 10 | Documentation, CI, cleanup | done (mypy+ruff+tests+smoke in CI) |

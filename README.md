@@ -1,5 +1,11 @@
 # QuantScope
 
+[![CI](https://github.com/akshatkumbhat/quantscope/actions/workflows/ci.yml/badge.svg)](https://github.com/akshatkumbhat/quantscope/actions/workflows/ci.yml)
+![release](https://img.shields.io/badge/release-v0.1.0-blue)
+![python](https://img.shields.io/badge/python-3.11%20%7C%203.12-blue)
+![torch](https://img.shields.io/badge/torch-2.2.2%20(validated)-orange)
+![license](https://img.shields.io/badge/license-MIT-green)
+
 Neural-network quantization, sensitivity analysis, and numerical
 debugging on CPU — with preregistered experiments, provenance-labeled
 artifacts, and an honest findings report.
@@ -7,6 +13,22 @@ artifacts, and an honest findings report.
 Findings (including the negative results and failed experiment gates)
 are summarized in **[docs/REPORT.md](docs/REPORT.md)**; decisions and
 experiment history live in [docs/DECISIONS.md](docs/DECISIONS.md).
+
+## Results at a glance
+
+Three frozen validation checkpoints; every W4A4 number **simulated**
+(fake-quant policy v1, never integer execution), FP32 **measured**,
+costs **estimated** under a fictional profile. Bootstrap 95% CIs over
+2000 paired eval samples; details and caveats in the report.
+
+| Finding | Headline number | Status |
+| --- | --- | --- |
+| QAT recovers PTQ damage (W4A4) | mean ΔNLL −0.044 vs PTQ, +1.6 pp, 3/3 seeds; all CIs exclude 0 | confirmed + confound-controlled (ADR-013/016) |
+| …and it's not just extra training | identical FP32 finetune + PTQ is *worse* than original PTQ on 3/3 | control upheld (ADR-016) |
+| Robust observers protect contaminated calibration | percentile vs MinMax ΔNLL ≤ −0.061 (stressed calib), 3/3 seeds | confirmed, scoped to input/early sites (ADR-012); replicated 2/2 on FashionMNIST (ADR-016) |
+| One-shot ablation rankings guide mixed-precision search | random 32-eval search beat the sensitivity path on 3/3 seeds | negative finding (ADR-010) |
+| Backend parity (Torch 2.2 FX INT8) | 0.0000 reference↔real-INT8 prediction disagreement, 3/3 seeds | validated; two named compatibility findings (ADR-011) |
+| Hardware-aware recommendations | change in 7/9 budget cells vs weight-bits proxy; driven by the W4A4/W8A8 compute ratio | estimated, fictional profile (ADR-014/016) |
 
 ## What is implemented
 
@@ -177,6 +199,16 @@ make check       # ruff lint + format + pytest
 
 CI (GitHub Actions) runs lint, format check, the fast suite, and a
 CLI smoke test on Python 3.11 and 3.12.
+
+## Documentation map
+
+| Document | What it is |
+| --- | --- |
+| [docs/REPORT.md](docs/REPORT.md) | The findings report: related work, every study's results with CIs, caveats, reproduction commands |
+| [docs/DECISIONS.md](docs/DECISIONS.md) | ADR-001..016 — the full preregistration/results audit trail, failed gates included |
+| [docs/architecture.md](docs/architecture.md) | Layering, package map, enforced invariants |
+| [docs/PROGRESS.md](docs/PROGRESS.md) | Chronological status log |
+| [CHANGELOG.md](CHANGELOG.md) | Release history (v0.1.0) |
 
 ## Disclaimer
 
