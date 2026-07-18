@@ -41,7 +41,13 @@ from torch.utils.data import DataLoader, Dataset
 from quantscope.quantization.affine import _EPS, Granularity, QuantParams, integer_range
 from quantscope.quantization.simulate import _INPUT_KEY, _WEIGHT_MODULES, _all_relu_sites
 
-__all__ = ["QATRecipe", "nll_gap_recovery", "qat_finetune", "torch_fake_quantize"]
+__all__ = [
+    "QATRecipe",
+    "fp32_finetune",
+    "nll_gap_recovery",
+    "qat_finetune",
+    "torch_fake_quantize",
+]
 
 
 def nll_gap_recovery(ptq_nll: float, qat_nll: float, fp32_nll: float) -> float:
@@ -198,35 +204,11 @@ def _attach_frozen_activation_fq(
     return handles
 
 
-def qat_finetune(
-    model: nn.Module,
-    train_dataset: Dataset,
-    act_params: Mapping[str, QuantParams],
-    recipe: QATRecipe,
-) -> tuple[nn.Module, QATHistory]:
-    """Fixed-quantization-specification QAT fine-tune (ADR-013).
-
-    Returns ``(finetuned_fp32_model, history)``. The returned model
-    carries plain FP32 weights (parametrizations removed); the caller
-    exports/evaluates it through the same NumPy simulation pipeline as
-    PTQ (``simulate_quantized_with_params``), which recomputes the
-    final weight qparams once.
-
-    Raises on any non-finite loss or gradient (success criterion 4 is
-    checked during training, not after).
-    """
-    model = copy.deepcopy(model)
-    model.train()
-
-    weight_modules = [m for m in model.modules() if isinstance(m, _WEIGHT_MODULES)]
-    if not weight_modules:
-        raise ValueError("model has no Conv2d/Linear modules to fine-tune")
-    for module in weight_modules:
-        parametrize.register_parametrization(
-            module, "weight", _WeightFakeQuant(bits=recipe.weight_bits)
-        )
-    handles = _attach_frozen_activation_fq(model, act_params)
-
+def _train_loop(model: nn.Module, train_dataset: Dataset, recipe: QATRecipe) -> QATHistory:
+    """The shared fine-tuning loop (identical seeding, batching,
+    optimizer, and schedule for the QAT arm and the ADR-016 FP32
+    control arm — the ONLY difference between arms is whether fake
+    quantization is attached to the model before this runs)."""
     torch.manual_seed(recipe.seed)
     generator = torch.Generator().manual_seed(recipe.seed)
     loader = DataLoader(
@@ -258,16 +240,64 @@ def qat_finetune(
         scheduler.step()
         history.epoch_train_loss.append(total / max(count, 1))
         logger.info(
-            "qat %s epoch %d/%d: train loss %.4f",
+            "finetune %s epoch %d/%d: train loss %.4f",
             recipe.label(),
             epoch + 1,
             recipe.epochs,
             history.epoch_train_loss[-1],
         )
+    return history
+
+
+def qat_finetune(
+    model: nn.Module,
+    train_dataset: Dataset,
+    act_params: Mapping[str, QuantParams],
+    recipe: QATRecipe,
+) -> tuple[nn.Module, QATHistory]:
+    """Fixed-quantization-specification QAT fine-tune (ADR-013).
+
+    Returns ``(finetuned_fp32_model, history)``. The returned model
+    carries plain FP32 weights (parametrizations removed); the caller
+    exports/evaluates it through the same NumPy simulation pipeline as
+    PTQ (``simulate_quantized_with_params``), which recomputes the
+    final weight qparams once.
+
+    Raises on any non-finite loss or gradient (success criterion 4 is
+    checked during training, not after).
+    """
+    model = copy.deepcopy(model)
+    model.train()
+
+    weight_modules = [m for m in model.modules() if isinstance(m, _WEIGHT_MODULES)]
+    if not weight_modules:
+        raise ValueError("model has no Conv2d/Linear modules to fine-tune")
+    for module in weight_modules:
+        parametrize.register_parametrization(
+            module, "weight", _WeightFakeQuant(bits=recipe.weight_bits)
+        )
+    handles = _attach_frozen_activation_fq(model, act_params)
+
+    history = _train_loop(model, train_dataset, recipe)
 
     for handle in handles:
         handle.remove()
     for module in weight_modules:
         parametrize.remove_parametrizations(module, "weight", leave_parametrized=False)
+    model.eval()
+    return model, history
+
+
+def fp32_finetune(
+    model: nn.Module, train_dataset: Dataset, recipe: QATRecipe
+) -> tuple[nn.Module, QATHistory]:
+    """ADR-016 Part A control arm: the identical fine-tune with NO fake
+    quantization anywhere — same recipe, seeding, batch order,
+    optimizer, and schedule as :func:`qat_finetune`, isolating the
+    effect of training through the quantizer from the effect of
+    training at all."""
+    model = copy.deepcopy(model)
+    model.train()
+    history = _train_loop(model, train_dataset, recipe)
     model.eval()
     return model, history
