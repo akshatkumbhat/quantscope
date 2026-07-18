@@ -16,6 +16,8 @@ MSE calibration is out of scope and rejected explicitly.
 
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
 
 from quantscope.analysis import mse
@@ -42,7 +44,7 @@ class _SamplingObserver(CalibrationObserver):
     """Shared machinery: keep a deterministic subsample of each batch."""
 
     def __init__(
-        self, *, samples_per_batch: int = _DEFAULT_SAMPLES_PER_BATCH, **kwargs: object
+        self, *, samples_per_batch: int = _DEFAULT_SAMPLES_PER_BATCH, **kwargs: Any
     ) -> None:
         super().__init__(**kwargs)  # type: ignore[arg-type]
         if self.granularity is not Granularity.PER_TENSOR:
@@ -78,7 +80,7 @@ class PercentileClippingObserver(_SamplingObserver):
         *,
         lower_percentile: float = 0.1,
         upper_percentile: float = 99.9,
-        **kwargs: object,
+        **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
         if not 0.0 <= lower_percentile < upper_percentile <= 100.0:
@@ -104,7 +106,7 @@ class PowerOfTwoScaleObserver(MinMaxObserver):
     induced clipping); steps become at most 2x coarser.
     """
 
-    def __init__(self, *, rounding: str = "up", **kwargs: object) -> None:
+    def __init__(self, *, rounding: str = "up", **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self.rounding = rounding
         # Validate the mode eagerly rather than failing after calibration.
@@ -146,7 +148,7 @@ class MSEGridSearchObserver(_SamplingObserver):
     """
 
     def __init__(
-        self, *, num_candidates: int = 32, min_clip_fraction: float = 0.3, **kwargs: object
+        self, *, num_candidates: int = 32, min_clip_fraction: float = 0.3, **kwargs: Any
     ) -> None:
         super().__init__(**kwargs)
         if num_candidates < 1:

@@ -45,7 +45,7 @@ SERIES = {"minmax": "#2a78d6", "percentile": "#1baf7a", "mse_grid": "#eda100", "
 # Ordinal blue ramp for the three decomposition stages (validated).
 STAGE_RAMP = ("#86b6ef", "#2a78d6", "#104281")
 
-_RC = {
+_RC: dict[str, Any] = {
     "figure.facecolor": SURFACE,
     "axes.facecolor": SURFACE,
     "savefig.facecolor": SURFACE,
@@ -69,6 +69,12 @@ _RC = {
 _PNG_META = {"Software": "quantscope build_report"}  # no timestamps
 
 
+def _rc() -> Any:
+    """matplotlib stubs type rc_context against a Literal-key dict; our
+    rc mapping is valid at runtime, so erase the type at the boundary."""
+    return _RC
+
+
 def _save(fig, path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(path, dpi=150, bbox_inches="tight", metadata=_PNG_META)
@@ -83,7 +89,7 @@ def fig_pareto_frontiers(sweeps: dict[int, list[SweepRecord]], out_path: Path) -
     """B3 per-checkpoint Pareto panels (never averaged) + overlap text."""
     seeds = sorted(sweeps)
     frontiers = {s: pareto_frontier(sweeps[s], quality="nll") for s in seeds}
-    with plt.rc_context(_RC):
+    with plt.rc_context(_rc()):
         fig, axes = plt.subplots(1, len(seeds), figsize=(3.4 * len(seeds), 3.2), sharey=True)
         axes = [axes] if len(seeds) == 1 else list(axes)
         for ax, seed in zip(axes, seeds, strict=True):
@@ -150,7 +156,7 @@ def fig_observer_factorial(
     seeds = sorted(per_seed)
     observers = list(SERIES)
     conditions = ("clean->clean", "stressed->clean")
-    with plt.rc_context(_RC):
+    with plt.rc_context(_rc()):
         fig, axes = plt.subplots(1, len(seeds), figsize=(3.5 * len(seeds), 3.4), sharey=True)
         axes = [axes] if len(seeds) == 1 else list(axes)
         width = 0.38
@@ -223,7 +229,7 @@ def fig_mechanism_decomposition(
     """Cumulative stage attribution of MinMax W4A4 damage per checkpoint."""
     seeds = sorted(decomposition)
     stages = ("input", "input+early", "input+early+deeper")
-    with plt.rc_context(_RC):
+    with plt.rc_context(_rc()):
         fig, ax = plt.subplots(figsize=(6.4, 3.4))
         y = list(range(len(seeds)))
         height = 0.22
@@ -293,7 +299,7 @@ def fig_pow2_cost(q3: dict[str, dict[str, dict[str, float]]], out_path: Path) ->
     condition, and checkpoint. Panels have different y-scales (labeled)."""
     conditions = ("clean->clean", "stressed->clean")
     configs = list(q3)
-    with plt.rc_context(_RC):
+    with plt.rc_context(_rc()):
         fig, axes = plt.subplots(1, 2, figsize=(7.2, 3.0))
         for ax, cond in zip(axes, conditions, strict=True):
             for i, cfg in enumerate(configs):

@@ -68,3 +68,11 @@ known-first-party = ["quantscope"]
 [tool.ruff.lint.per-file-ignores]
 # B008: typer declares CLI options via function-call defaults by design.
 "src/quantscope/cli.py" = ["B008"]
+
+[tool.mypy]
+python_version = "3.11"
+files = ["src/quantscope"]
+
+[[tool.mypy.overrides]]
+module = ["yaml", "yaml.*", "scipy.*", "torchvision.*"]
+ignore_missing_imports = true

@@ -14,7 +14,7 @@ import platform
 import sys
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple
 
 import numpy as np
 import torch
@@ -48,32 +48,33 @@ NUM_EVAL = 64
 NUM_CALIB = 32
 CONFIGS = (SimQuantConfig(8, 8), SimQuantConfig(4, 4))
 
+
 # Tolerance families (ADR-015 table; rationales attached per rule).
-_TORCH_FLOAT = {
-    "atol": 1e-6,
-    "rtol": 1e-5,
-    "rationale": "float32 torch reductions may reorder across CPU/BLAS builds within ulps",
-}
-_NUMPY_SCALE = {
-    "atol": 1e-9,
-    "rtol": 1e-7,
-    "rationale": "scales stored float32; headroom only for libm-level platform variation",
-}
+class _Tolerance(NamedTuple):
+    atol: float
+    rtol: float
+    rationale: str
+
+
+_TORCH_FLOAT = _Tolerance(
+    1e-6, 1e-5, "float32 torch reductions may reorder across CPU/BLAS builds within ulps"
+)
+_NUMPY_SCALE = _Tolerance(
+    1e-9, 1e-7, "scales stored float32; headroom only for libm-level platform variation"
+)
 # ReLU-site scales are min-max extremes of activations computed THROUGH
 # float32 torch convolutions: cross-BLAS builds differ by a few ulps
 # (~1e-7 relative, observed on Linux CI vs the macOS capture), so they
 # take the torch family, quantified before widening (ADR-015).
-_TORCH_SCALE = {
-    "atol": 1e-9,
-    "rtol": 1e-5,
-    "rationale": "activation extremes pass through float32 torch convs; cross-BLAS "
+_TORCH_SCALE = _Tolerance(
+    1e-9,
+    1e-5,
+    "activation extremes pass through float32 torch convs; cross-BLAS "
     "differences of a few ulps (~1e-7 rel observed) with 1e-5 headroom",
-}
-_HW_COST = {
-    "atol": 1e-12,
-    "rtol": 0.0,
-    "rationale": "pure float64 arithmetic on integer counts times declared coefficients",
-}
+)
+_HW_COST = _Tolerance(
+    1e-12, 0.0, "pure float64 arithmetic on integer counts times declared coefficients"
+)
 
 
 def _environment() -> dict[str, str]:
@@ -219,7 +220,9 @@ def build_smoke_baseline(artifact: dict, *, capture_command: str) -> BaselineSpe
             comparator=ComparatorType.CLOSE,
             expected=sections["hardware_cost"]["all_int4_normalized"]["value"],
             provenance="estimated",
-            **_HW_COST,
+            atol=_HW_COST.atol,
+            rtol=_HW_COST.rtol,
+            rationale=_HW_COST.rationale,
         )
     )
     for section in ("fp32", "w8a8", "w4a4"):
@@ -248,7 +251,9 @@ def build_smoke_baseline(artifact: dict, *, capture_command: str) -> BaselineSpe
                     comparator=ComparatorType.CLOSE,
                     expected=body[metric]["value"],
                     provenance=provenance,
-                    **_TORCH_FLOAT,
+                    atol=_TORCH_FLOAT.atol,
+                    rtol=_TORCH_FLOAT.rtol,
+                    rationale=_TORCH_FLOAT.rationale,
                 )
             )
         if "scales" in body:
@@ -261,7 +266,9 @@ def build_smoke_baseline(artifact: dict, *, capture_command: str) -> BaselineSpe
                         comparator=ComparatorType.CLOSE,
                         expected=leaf["value"],
                         provenance="measured",
-                        **family,
+                        atol=family.atol,
+                        rtol=family.rtol,
+                        rationale=family.rationale,
                     )
                 )
             for site, leaf in sorted(body["zero_points"].items()):

@@ -132,7 +132,9 @@ def _fake_quantize_weights(model: nn.Module, bits_by_module: Mapping[str, int]) 
 
 
 def _all_relu_sites(model: nn.Module) -> dict[str, nn.Module]:
-    sites = {name: module for name, module in model.named_modules() if isinstance(module, nn.ReLU)}
+    sites: dict[str, nn.Module] = {
+        name: module for name, module in model.named_modules() if isinstance(module, nn.ReLU)
+    }
     if not sites:
         raise ValueError("model contains no ReLU modules; policy v1 cannot apply")
     return sites

@@ -23,6 +23,7 @@ import copy
 import json
 import logging
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import torch
@@ -57,7 +58,7 @@ def _collect_logits(model: nn.Module, dataset: Dataset, *, batch_size: int = 64)
 
 def _model_comparison(
     name_a: str, logits_a: np.ndarray, name_b: str, logits_b: np.ndarray
-) -> dict[str, float]:
+) -> dict[str, Any]:
     metrics = compare_tensors(logits_b, logits_a).to_dict()
     disagreement = float(np.mean(logits_a.argmax(1) != logits_b.argmax(1)))
     per_sample = np.abs(logits_a - logits_b).max(axis=1)
@@ -147,8 +148,14 @@ def _qparam_parity(prepared: nn.Module) -> list[dict[str, object]]:
                     "torch_zp": int(t_zp),
                     "qs_zp": int(ours.zero_point),
                     "zp_equal": int(t_zp) == int(ours.zero_point),
-                    "searched_range": [float(bounds.low), float(bounds.high)],
-                    "raw_range": [float(bounds.raw_low), float(bounds.raw_high)],
+                    "searched_range": [
+                        float(np.asarray(bounds.low)),
+                        float(np.asarray(bounds.high)),
+                    ],
+                    "raw_range": [
+                        float(np.asarray(bounds.raw_low)),
+                        float(np.asarray(bounds.raw_high)),
+                    ],
                 }
             )
     for name, module in weighted_modules(prepared).items():
@@ -279,7 +286,7 @@ def run_backend_parity(
     test_set: Dataset,
     *,
     checkpoint: str | Path,
-) -> dict[str, object]:
+) -> dict[str, Any]:
     """Run the full staged parity investigation on one checkpoint."""
     from torch.ao.quantization import get_default_qconfig_mapping
     from torch.ao.quantization.quantize_fx import prepare_fx

@@ -275,6 +275,23 @@ addenda 2–4); B2's checkpoint-conditioned-sensitivity conclusion stands.
 
 **Every mandatory definition-of-done item is now implemented.**
 
+## Rigor amendments status (2026-07-18, ADR-016)
+
+- [x] QAT control arm: **claim UPHELD 3/3** — identical FP32
+  fine-tune + PTQ does not reproduce the QAT gain (control-PTQ worse
+  than original PTQ on every seed); the confound objection is
+  answered with data.
+- [x] FashionMNIST replication: D primary finding **REPLICATED 2/2**
+  (direction-only claim; larger effects than the synthetic
+  benchmark; the project's only dataset download, documented).
+- [x] Bootstrap 95% CIs: every headline delta excludes zero
+  (consistency-gated recomputation, 1e-6).
+- [x] Coefficient sensitivity: recommendations driven by the
+  W4A4/W8A8 compute ratio; memory coefficients irrelevant under this
+  profile shape (honest ADR-014 caveat recorded).
+- [x] mypy clean on all 49 source files and added to CI; related-work
+  section and QAT/ADR-016 results added to docs/REPORT.md.
+
 ## Next actions
 
 1. Optional appendix list only (run if separately approved): W3A3;

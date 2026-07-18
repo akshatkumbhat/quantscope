@@ -21,6 +21,33 @@ No latency was measured anywhere in these experiments, and nothing in
 this report is NPU or hardware performance. The hardware profile in
 this repository is fictional and illustrative.
 
+## Related work (positioning, not novelty claims)
+
+QuantScope reimplements standard quantization components at teaching
+scale and tests them under preregistered protocols; none of the
+individual mechanisms is novel. Affine quantization, QAT with fake
+quantization, and integer-arithmetic inference follow Jacob et al.
+(CVPR 2018) and the surveys of Gholami et al. (2021) and Nagel et al.
+(2021). The straight-through estimator is Bengio et al. (2013); our
+*fixed-quantization-specification* QAT is a deliberately simpler
+cousin of learned-scale methods such as PACT (Choi et al., 2018) and
+LSQ (Esser et al., ICLR 2020) — scales are derived, not learned,
+which isolates weight adaptation as the only mechanism. Calibration
+clipping against outliers is established practice: percentile/entropy
+calibration (Migacz, TensorRT 2017), analytical clipping in ACIQ
+(Banner et al., NeurIPS 2019), rounding-aware methods like AdaRound
+(Nagel et al., ICML 2020); activation-outlier sensitivity at low bit
+widths is also central to SmoothQuant (Xiao et al., 2022). Our
+contribution there is not the observers but the *paired,
+gate-controlled contamination protocol* and the mechanism
+decomposition. Sensitivity-guided mixed-precision search follows
+HAWQ (Dong et al., ICCV 2019) and HAQ (Wang et al., CVPR 2019); our
+negative finding — one-at-a-time ablation rankings failing to guide
+joint assignment on this benchmark — is consistent with the known
+limitation that per-layer sensitivity ignores interaction effects,
+and is offered as a documented small-scale data point, not a
+refutation of those methods.
+
 ## Benchmark context
 
 All findings are on the Texture-10 synthetic benchmark (frozen
@@ -184,6 +211,58 @@ separation here is not.
    sites.
 2. **Every W4A4/W8A4/W8A8 number in D is simulated** (fake-quant
    policy v1), not measured integer execution.
+
+## QAT — fixed-specification fine-tuning recovers most PTQ damage
+(ADR-013 + ADR-016 control)
+
+Fixed-quantization-specification W4A4 QAT (frozen activation qparams;
+weight scales re-derived per forward under the frozen rule; clipped
+STE; 10 epochs at lr 3e-4, epoch-10 checkpoint, no warm-up) was
+preregistered, recipe-selected on a fresh dev seed, and run once per
+validation checkpoint. All W4A4 values simulated; FP32 measured;
+bootstrap 95% CIs (n=2000 paired samples, B=10,000) in brackets.
+
+| seed | PTQ → QAT NLL | ΔNLL [95% CI] | acc recovery | gap recovery |
+| --- | --- | --- | --- | --- |
+| 0 | 0.1853 → 0.1122 | −0.0731 [−0.0905, −0.0567] | +2.70 pp | 0.940 |
+| 1 | 0.1782 → 0.1328 | −0.0454 [−0.0625, −0.0279] | +1.55 pp | 0.828 |
+| 2 | 0.1525 → 0.1400 | −0.0125 [−0.0227, −0.0024] | +0.55 pp | 0.518 |
+
+**The confound control (ADR-016):** an identical fine-tune with no
+fake quantization (same seeds, batch order, optimizer, schedule),
+followed by standard PTQ, does NOT reproduce the gain — control-PTQ
+landed *worse* than the original PTQ on every checkpoint (+0.0302 /
++0.0201 / +0.0129 NLL, all CIs excluding zero), and QAT beat the
+control by −0.1033 / −0.0655 / −0.0254 (all CIs exclude zero). The
+gain is therefore attributable to training *through* the quantizer,
+not to extra training. Every interval above excludes zero, including
+the smallest effect (seed 2). Effect size tracks the PTQ gap; no
+checkpoint reached FP32 quality (not required by the ADR).
+
+## External replication (ADR-016): the observer finding survives real
+data
+
+The D-study primary finding — percentile calibration protects W4A4
+NLL against impulse-contaminated calibration relative to MinMax —
+was replicated as a *direction-only* claim on FashionMNIST (the
+project's only dataset download; 12k-sample training subset, 2 seeds,
+TinyCNN, FP32 85.1/85.2% measured). It replicated on 2/2 seeds with
+larger effects than the synthetic benchmark: stressed→clean W4A4 NLL
+0.8232 (MinMax) vs 0.5324 (percentile) on seed 0, and 2.3105 vs
+0.8560 on seed 1 (simulated). Magnitudes are reported, not claimed.
+The synthetic-benchmark bootstrap CIs for the same contrast also all
+exclude zero (upper bounds ≤ −0.041 NLL).
+
+## Cost-model sensitivity (ADR-016): the load-bearing assumption
+
+One-at-a-time ±50% sweeps over all six profile coefficients show the
+ADR-014 recommendations are driven almost entirely by the
+W4A4-vs-W8A8 compute-cost ratio (3–9 of 9 checkpoint×budget
+recommendations change) and are completely insensitive to both
+memory coefficients and the unused precision pairs (0 of 9 change).
+Anyone adapting the profile to real hardware should calibrate that
+compute ratio first; the memory terms barely matter under this
+profile shape. All estimated; the profile remains fictional.
 
 ## Reproducing the figures
 

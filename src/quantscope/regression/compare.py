@@ -106,7 +106,8 @@ def _require(condition: bool, message: str) -> None:
 
 def _check_environment(artifact: dict, baseline: BaselineSpec) -> None:
     environment = artifact.get("environment")
-    _require(isinstance(environment, dict), "artifact has no environment block")
+    if not isinstance(environment, dict):
+        raise HarnessError("artifact has no environment block")
     rules = baseline.environment_rules
     for key, expected in rules.exact.items():
         actual = environment.get(key)

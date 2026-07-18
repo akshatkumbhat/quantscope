@@ -1933,3 +1933,48 @@ errors found across 10 files — decision is to FIX and add mypy to CI
 No W3A3/Q4; the Torch 2.2.2 guard stays; original artifacts of
 B/C/D/QAT/hwcost are never rewritten; FashionMNIST is used ONLY for
 Part B; no accuracy/latency claims about real hardware.
+
+### ADR-016 addendum: results — all four parts complete (2026-07-18)
+
+**Part A — control arm: ADR-013 claim UPHELD (3/3 checkpoints, mean
+gap +0.0647, threshold 0.01).** The FP32-finetune control (identical
+recipe, no fake quant) slightly improved FP32 NLL (e.g. seed 0
+0.1039 vs 0.1075) but its PTQ landed WORSE than the original PTQ on
+every seed (control-PTQ minus PTQ: +0.0302 / +0.0201 / +0.0129, all
+CIs excluding zero) — extended training alone not only fails to
+reproduce QAT's gain, it degrades PTQ robustness. QAT beat the
+control by −0.1033 / −0.0655 / −0.0254 NLL (all CIs exclude zero).
+The adaptation claim now rests on a proper counterfactual. Artifacts:
+`runs/validation-012/texture-a-seed{0,1,2}-qat-control/`,
+`qat-control-summary.json`.
+
+**Part B — FashionMNIST replication: REPLICATED (2/2 seeds).** The
+direction of the D primary finding reproduces on real data with
+LARGER effects than the synthetic benchmark: stressed→clean W4A4 NLL
+minmax 0.8232 vs percentile 0.5324 (seed 0, Δ −0.2908) and 2.3105 vs
+0.8560 (seed 1, Δ −1.4545); FP32 85.1/85.2% measured. Direction was
+the preregistered claim; magnitudes reported only. First and only
+dataset download (~30 MB, script-only). Artifact:
+`runs/replication-fashionmnist/replication-summary.json`.
+
+**Part C — bootstrap 95% CIs (n=2000, B=10,000, paired): every
+headline delta excludes zero**, including seed 2's smallest QAT
+effect (−0.0125 [−0.0227, −0.0024]) and all D-study robust-observer
+deltas (e.g. percentile−minmax −0.0610/−0.0692/−0.0791, upper bounds
+≤ −0.041). All recomputed means matched recorded artifacts within
+1e-6. Artifact: `bootstrap-ci-summary.json`.
+
+**Part D — coefficient sensitivity: recommendations are driven by
+the W4A4/W8A8 compute-cost ratio and robust to everything else.**
+±50% on the two used compute coefficients changes 3–9 of 9
+checkpoint×budget recommendations; ±50% on the unused pair
+coefficients and BOTH memory coefficients changes 0 of 9. An honest
+caveat for ADR-014: under this profile shape, memory-coefficient
+assumptions barely matter; the compute ratio is the load-bearing
+assumption. All estimated. Artifact:
+`hwcost-sensitivity-summary.json`.
+
+**Non-experimental:** mypy now passes clean on all 49 source files
+(config in pyproject; stubs-missing overrides for yaml/scipy/
+torchvision) and joins CI; related work and the QAT/ADR-016 results
+enter `docs/REPORT.md`.
