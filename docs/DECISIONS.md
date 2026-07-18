@@ -1832,3 +1832,104 @@ torch is an incompatible input, not a code regression.
 
 **ADR-015 PASSES. With it, every mandatory item in the CLAUDE.md
 definition of done is implemented.**
+
+## ADR-016: rigor amendments — QAT control arm, external replication,
+bootstrap uncertainty, coefficient sensitivity (preregistered
+2026-07-17, committed before any run)
+
+External review identified four rigor gaps. Each experimental part is
+preregistered here before execution; results may revise earlier
+conclusions and will be recorded either way.
+
+### Part A — QAT control arm (the missing confound control)
+
+ADR-013 showed QAT W4A4 beats PTQ W4A4, but the QAT arm received 10
+extra epochs of training that the PTQ arm did not. The control:
+**fine-tune each validation checkpoint in plain FP32** with the
+IDENTICAL frozen recipe (AdamW, lr 3e-4, wd 1e-4, batch 64, cosine,
+10 epochs, seed 100+checkpoint-seed, same train split and batch
+order, epoch-10 checkpoint, no fake quantization anywhere), then
+apply the standard PTQ procedure to the fine-tuned model (MinMax
+calibration of the fine-tuned model on the same clean calibration
+split, W4A4, policy v1). One run per validation seed 0/1/2; no
+tuning; artifacts labeled as ever.
+
+Predeclared interpretation (thresholds mirror ADR-013):
+
+- ADR-013's adaptation claim is **upheld** iff QAT W4A4 NLL <
+  control-PTQ W4A4 NLL on ≥ 2 of 3 checkpoints AND the mean
+  improvement is ≥ 0.01 NLL.
+- If the control matches or beats QAT (mean gap < 0.01 or ≤ 1/3
+  checkpoints favorable), ADR-013's claim is **downgraded** in a
+  results addendum: gains attributable to extended training rather
+  than quantizer adaptation. Both outcomes are publishable; the
+  earlier artifacts are never rewritten.
+- Also reported (not gated): control FP32 quality (extended training
+  may lift the FP32 ceiling), control-PTQ vs original-PTQ, QAT vs
+  control at equal training budget.
+
+### Part B — external replication of the D primary finding
+
+One finding, one real dataset, direction-only claim: **percentile
+calibration protects W4A4 NLL against impulse-contaminated
+calibration relative to MinMax** (D study primary condition), on
+FashionMNIST.
+
+- Data: FashionMNIST via torchvision (~30 MB download; documented
+  here as the project's first and only dataset download; script-only,
+  never in tests or CI; cached under /data at the repo root, which is
+  gitignored).
+- Design: train a small CNN (TinyCNN, 10 classes, 28×28) on a fixed
+  12,000-sample training subset for 6 epochs, seeds 0 and 1
+  (CPU-feasible); 2,000-sample eval subset; 256-sample calibration
+  subset (deterministic index slices of the canonical split). Stress:
+  the frozen impulse mechanism (fraction 0.002, 7σ, stress seed
+  1000+seed) applied to the finished calibration tensors. Arms:
+  MinMax vs Percentile(0.1/99.9), W4A4, policy v1, stressed
+  calibration → clean evaluation, plus clean→clean for context.
+- Success (direction replication): percentile NLL < MinMax NLL in the
+  primary condition on **2 of 2 seeds**. Magnitudes are reported but
+  NOT part of the claim; a failed replication is recorded with equal
+  prominence and scopes the D finding to the synthetic benchmark.
+
+### Part C — bootstrap uncertainty on headline numbers
+
+Nonparametric bootstrap over evaluation samples (n = 2000; B =
+10,000 resamples; numpy seed 0; percentile 95% intervals) for:
+
+1. QAT − PTQ ΔNLL per validation seed (and QAT − control,
+   control − PTQ once Part A runs);
+2. D primary condition: percentile − MinMax and MSE-grid − MinMax
+   ΔNLL per seed.
+
+Per-sample NLLs are recomputed from the existing frozen checkpoints
+and saved QAT weights through the identical evaluation pipeline —
+evaluation-only recomputation, no retraining; each recomputed mean
+must match the recorded artifact aggregate within 1e-6 or the run
+stops as a provenance failure. CIs are reported alongside (never in
+place of) the recorded point values.
+
+### Part D — hardware-profile coefficient sensitivity
+
+For each profile coefficient (the four compute pair coefficients and
+the two memory coefficients), scale it by 0.5× and 1.5× (one at a
+time, 12 variants), rebuild costs for the frozen B3 tables, and
+report per checkpoint: whether each budget recommendation (0.60 /
+0.75 / 0.90) changes, and Pareto-membership Jaccard vs the canonical
+profile. All estimated; fictional profile; measurement claims none.
+This quantifies how sensitive the ADR-014 recommendations are to the
+assumed coefficients.
+
+### Non-experimental items (same work package)
+
+Related-work section in `docs/REPORT.md` (situating observers, QAT,
+and mixed-precision search against published methods; ~10 citations);
+report gains its QAT section and these Part A–D results; mypy: 34
+errors found across 10 files — decision is to FIX and add mypy to CI
+(carrying an unused tool contradicted the repo's standards).
+
+### Scope exclusions
+
+No W3A3/Q4; the Torch 2.2.2 guard stays; original artifacts of
+B/C/D/QAT/hwcost are never rewritten; FashionMNIST is used ONLY for
+Part B; no accuracy/latency claims about real hardware.
